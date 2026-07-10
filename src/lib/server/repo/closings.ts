@@ -101,6 +101,25 @@ interface PrevEntry {
 	progress: number;
 }
 
+/** 再〆初期値の計算に必要な前回明細の抜粋。 */
+export interface PrevFinalSnapshot {
+	measuredSeconds: number;
+	finalSeconds: number;
+}
+
+/**
+ * 確定時間の初期値を計算する（純関数・DB非依存）。
+ * - 前回明細あり: 前回final + max(今回measured − 前回measured, 0)
+ * - 前回明細なし（初回〆）: 今回measured をそのまま
+ */
+export function computeInitialFinalSeconds(
+	measuredSeconds: number,
+	prev: PrevFinalSnapshot | null
+): number {
+	if (prev) return prev.finalSeconds + Math.max(measuredSeconds - prev.measuredSeconds, 0);
+	return measuredSeconds;
+}
+
 /** 対象closingの既存明細を ticket_id→{measured,final,progress} で返す。 */
 function prevEntriesByTicket(closingId: number): Map<number, PrevEntry> {
 	const rows = getDb()
@@ -149,12 +168,10 @@ export function getClosingDraft(workDate: string): ClosingDraft {
 		const m = measured.get(ticketId) ?? 0;
 		const p = prev.get(ticketId);
 
-		let initialFinal: number;
-		if (p) {
-			initialFinal = p.final_seconds + Math.max(m - p.measured_seconds, 0);
-		} else {
-			initialFinal = m;
-		}
+		const initialFinal = computeInitialFinalSeconds(
+			m,
+			p ? { measuredSeconds: p.measured_seconds, finalSeconds: p.final_seconds } : null
+		);
 
 		if (t) {
 			rows.push({
@@ -204,8 +221,13 @@ function formUrlSettings(s: Record<string, string>): FormUrlSettings {
  * 対象業務日付の〆を確定する（1トランザクション）。
  * - 冒頭で対象日の走行中セッションを再チェックし、あれば abort（エラー送出）
  * - daily_closings upsert → 対象closingの明細を全DELETE→INSERT
+ * - 対象集合はサーバー側で再構築する（送信 inputs を真実として扱わない）。
+ *   対象 = 今回計測のあるチケット ∪ 既存明細のチケット。
+ *   inputs に含まれないチケットはサーバー側初期値で補完する
+ *   （final=前回entryありなら getClosingDraft と同じ再〆初期値、なければ今回measured。
+ *    progress / status は現在のチケット値。本体の更新はしない）。
  * - measured はサーバー側で再計算。final_seconds=0 の行は明細に含めない
- * - tickets.progress / status_id を同一トランザクションで更新
+ * - ユーザー入力があった行のみ tickets.progress / status_id を同一トランザクションで更新
  * @returns 明細スナップショット一覧（フォームURL付き。final=0 は含まない）
  */
 export function confirmClosing(workDate: string, inputs: ClosingEntryInput[]): ClosedEntry[] {
@@ -233,6 +255,7 @@ export function confirmClosing(workDate: string, inputs: ClosingEntryInput[]): C
 				.run(workDate, now);
 			closingId = Number(info.lastInsertRowid);
 		}
+		const prev = existing ? prevEntriesByTicket(existing.id) : new Map<number, PrevEntry>();
 
 		// 明細を全置換
 		db.prepare('DELETE FROM daily_entries WHERE closing_id = ?').run(closingId);
@@ -247,64 +270,98 @@ export function confirmClosing(workDate: string, inputs: ClosingEntryInput[]): C
 			'UPDATE tickets SET progress = ?, status_id = ?, updated_at = ? WHERE id = ?'
 		);
 
+		// 対象集合をサーバー側で再構築（送信 inputs を真実にしない）
+		const inputsByTicket = new Map<number, ClosingEntryInput>();
+		for (const input of inputs) inputsByTicket.set(input.ticketId, input);
+		const targetIds = new Set<number>([...measured.keys(), ...prev.keys()]);
+
 		const result: ClosedEntry[] = [];
-		for (const input of inputs) {
-			const t = db
+		for (const ticketId of targetIds) {
+			// チケット本体（自身の status を含む）を取得
+			const base = db
 				.prepare(
-					`SELECT t.id, t.key, t.title, t.jira_url, s.id AS status_id, s.name AS status_name
-					 FROM tickets t JOIN statuses s ON s.id = ?
-					 WHERE t.id = ?`
+					`SELECT t.id, t.key, t.title, t.jira_url, t.progress, t.status_id
+					 FROM tickets t WHERE t.id = ?`
 				)
-				.get(input.statusId, input.ticketId) as
+				.get(ticketId) as
 				| {
 						id: number;
 						key: string;
 						title: string;
 						jira_url: string | null;
+						progress: number;
 						status_id: number;
-						status_name: string;
 				  }
 				| undefined;
-			if (!t) continue;
+			if (!base) continue;
 
-			// ステータス・進捗はチケット本体へ反映（final=0 でも反映する）
-			updateTicket.run(input.progress, input.statusId, now, input.ticketId);
+			const m = measured.get(ticketId) ?? 0;
+			const p = prev.get(ticketId);
+			const submitted = inputsByTicket.get(ticketId);
+
+			let finalSeconds: number;
+			let progress: number;
+			let statusId: number;
+			if (submitted) {
+				finalSeconds = submitted.finalSeconds;
+				progress = submitted.progress;
+				statusId = submitted.statusId;
+			} else {
+				// 送信 inputs に無いチケットはサーバー側初期値で補完する
+				finalSeconds = computeInitialFinalSeconds(
+					m,
+					p ? { measuredSeconds: p.measured_seconds, finalSeconds: p.final_seconds } : null
+				);
+				progress = base.progress;
+				statusId = base.status_id;
+			}
+
+			// status 名を解決（不正 statusId の行はスキップ＝明細にも本体更新にも反映しない）
+			const status = db.prepare('SELECT id, name FROM statuses WHERE id = ?').get(statusId) as
+				| { id: number; name: string }
+				| undefined;
+			if (!status) continue;
+
+			// ステータス・進捗はチケット本体へ反映（final=0 でも反映する）。
+			// ユーザー入力があった行のみ更新し、補完行は現在値のまま触らない。
+			if (submitted) {
+				updateTicket.run(progress, statusId, now, ticketId);
+			}
 
 			// 確定値0秒はその日作業なし扱いで明細に含めない
-			if (input.finalSeconds <= 0) continue;
+			if (finalSeconds <= 0) continue;
 
-			const jiraUrl = t.jira_url ?? '';
+			const jiraUrl = base.jira_url ?? '';
 			const formUrl = buildFormUrl(fus, {
 				workDate,
-				title: t.title,
+				title: base.title,
 				jiraUrl,
-				progress: input.progress,
-				finalSeconds: input.finalSeconds
+				progress,
+				finalSeconds
 			});
-			const m = measured.get(input.ticketId) ?? 0;
 
 			insertEntry.run(
 				closingId,
-				input.ticketId,
+				ticketId,
 				m,
-				input.finalSeconds,
-				input.progress,
-				t.key,
-				t.title,
+				finalSeconds,
+				progress,
+				base.key,
+				base.title,
 				jiraUrl,
-				t.status_name,
+				status.name,
 				formUrl
 			);
 
 			result.push({
-				ticketId: input.ticketId,
-				ticketKey: t.key,
-				title: t.title,
+				ticketId,
+				ticketKey: base.key,
+				title: base.title,
 				jiraUrl,
 				measuredSeconds: m,
-				finalSeconds: input.finalSeconds,
-				progress: input.progress,
-				statusName: t.status_name,
+				finalSeconds,
+				progress,
+				statusName: status.name,
 				formUrl
 			});
 		}
