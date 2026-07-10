@@ -75,6 +75,12 @@ export function updateStatus(
 		.run(name, kind, sortOrder, id);
 }
 
+/** 指定 ID のステータスが存在するか。 */
+export function statusExists(id: number): boolean {
+	const row = getDb().prepare('SELECT 1 FROM statuses WHERE id = ? LIMIT 1').get(id);
+	return !!row;
+}
+
 /** このステータスを参照している tickets が存在するか。 */
 export function isStatusUsed(id: number): boolean {
 	const row = getDb().prepare('SELECT 1 FROM tickets WHERE status_id = ? LIMIT 1').get(id);

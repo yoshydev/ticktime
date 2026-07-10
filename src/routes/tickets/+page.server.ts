@@ -8,7 +8,8 @@ import {
 	cumulativeByTicket,
 	type Ticket
 } from '$lib/server/repo/tickets';
-import { listStatuses } from '$lib/server/repo/settings';
+import { listStatuses, statusExists } from '$lib/server/repo/settings';
+import { isSafeHttpUrl } from '$lib/url';
 
 export interface TicketWithStats extends Ticket {
 	totalSeconds: number;
@@ -49,8 +50,14 @@ export const actions: Actions = {
 		if (!Number.isInteger(statusId) || statusId <= 0) {
 			return fail(400, { message: 'ステータスが不正です' });
 		}
+		if (!statusExists(statusId)) {
+			return fail(400, { message: '指定されたステータスが存在しません' });
+		}
 		if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
 			return fail(400, { message: '進捗は0〜100の整数で入力してください' });
+		}
+		if (jiraUrl !== null && !isSafeHttpUrl(jiraUrl)) {
+			return fail(400, { message: 'Jira URL は http/https のURLを入力してください' });
 		}
 
 		try {

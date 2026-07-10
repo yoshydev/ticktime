@@ -67,6 +67,12 @@ export function listAllTickets(): Ticket[] {
 	return rows.map(mapRow);
 }
 
+/** 指定 ID のチケットが存在するか。 */
+export function ticketExists(id: number): boolean {
+	const row = getDb().prepare('SELECT 1 FROM tickets WHERE id = ? LIMIT 1').get(id);
+	return !!row;
+}
+
 export function getTicket(id: number): Ticket | null {
 	const row = getDb().prepare(`${SELECT_BASE} WHERE t.id = ?`).get(id) as TicketRow | undefined;
 	return row ? mapRow(row) : null;

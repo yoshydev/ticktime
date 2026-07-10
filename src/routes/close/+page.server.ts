@@ -7,7 +7,7 @@ import {
 	type ClosingEntryInput,
 	type ClosedEntry
 } from '$lib/server/repo/closings';
-import { listStatuses } from '$lib/server/repo/settings';
+import { listStatuses, statusExists } from '$lib/server/repo/settings';
 import { parseDuration } from '$lib/duration';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -55,6 +55,9 @@ export const actions: Actions = {
 			const statusId = Number(form.get(`status_${ticketId}`));
 			if (!Number.isInteger(statusId) || statusId <= 0) {
 				return fail(400, { message: 'ステータスが不正です', workDate });
+			}
+			if (!statusExists(statusId)) {
+				return fail(400, { message: '指定されたステータスが存在しません', workDate });
 			}
 			inputs.push({ ticketId, finalSeconds, progress, statusId });
 		}

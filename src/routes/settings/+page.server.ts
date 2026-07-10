@@ -10,6 +10,7 @@ import {
 	type Status
 } from '$lib/server/repo/settings';
 import { probeConnection, type JiraProbeResult } from '$lib/server/jira';
+import { isSafeHttpUrl } from '$lib/url';
 
 /** 一般設定フォームで編集可能な設定キー（entry ID は 6 項目）。 */
 const GENERAL_KEYS = [
@@ -55,6 +56,18 @@ export const actions: Actions = {
 
 		if (values.form_base_url === '') {
 			return fail(400, { section: 'general', message: 'フォームベースURLは必須です' });
+		}
+		if (!isSafeHttpUrl(values.form_base_url)) {
+			return fail(400, {
+				section: 'general',
+				message: 'フォームベースURLは http/https のURLを入力してください'
+			});
+		}
+		if (values.jira_browse_base !== '' && !isSafeHttpUrl(values.jira_browse_base)) {
+			return fail(400, {
+				section: 'general',
+				message: 'Jira ブラウズベースURLは http/https のURLを入力してください'
+			});
 		}
 
 		updateSettings(values);
