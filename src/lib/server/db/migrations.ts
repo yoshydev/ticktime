@@ -83,5 +83,11 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('form_entry_hours',     ''),
   ('jira_browse_base',     ''),
   ('day_boundary_hour',    '5');
+`,
+	// --- migration 2: jira_browse_base の既定値埋め（空のままの既存DB向け） ---
+	`
+UPDATE settings
+SET value = 'https://example.atlassian.net/browse/'
+WHERE key = 'jira_browse_base' AND value = '';
 `
 ];

@@ -1,4 +1,5 @@
 import { getDb } from '$lib/server/db';
+import { getSetting } from './settings';
 
 export interface Ticket {
 	id: number;
@@ -87,14 +88,23 @@ function defaultStatusId(): number {
 	return any.id;
 }
 
+/** jira_browse_base 設定とキーから Jira URL を導出する。base が空なら null。 */
+export function deriveJiraUrl(key: string): string | null {
+	const base = getSetting('jira_browse_base').trim();
+	if (base === '') return null;
+	return base.endsWith('/') ? `${base}${key}` : `${base}/${key}`;
+}
+
 /**
  * チケットを追加する。title が空なら key を仮タイトルにする。
+ * jiraUrl が空の場合は jira_browse_base 設定 + key から導出して保存する。
  * 既存 key と重複する場合はエラーを投げる。
  */
 export function addTicket(input: { key: string; title?: string; jiraUrl?: string | null }): Ticket {
 	const key = input.key.trim();
 	if (key === '') throw new Error('チケット番号は必須です');
 	const title = (input.title ?? '').trim() || key;
+	const jiraUrl = (input.jiraUrl ?? '').trim() || deriveJiraUrl(key);
 	const now = Date.now();
 	const db = getDb();
 	const info = db
@@ -102,7 +112,7 @@ export function addTicket(input: { key: string; title?: string; jiraUrl?: string
 			`INSERT INTO tickets (key, title, jira_url, status_id, progress, imported_seconds, created_at, updated_at)
 			 VALUES (?, ?, ?, ?, 0, 0, ?, ?)`
 		)
-		.run(key, title, input.jiraUrl ?? null, defaultStatusId(), now, now);
+		.run(key, title, jiraUrl, defaultStatusId(), now, now);
 	const created = getTicket(Number(info.lastInsertRowid));
 	if (!created) throw new Error('チケット作成に失敗しました');
 	return created;
