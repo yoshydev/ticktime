@@ -1,5 +1,3 @@
-import type { Database } from 'better-sqlite3';
-
 /**
  * マイグレーション定義。
  * 配列のインデックス+1 が user_version に対応する（migrations[0] = version 1）。
