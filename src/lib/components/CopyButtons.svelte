@@ -48,16 +48,21 @@
 	}
 	.copy-btn {
 		font-size: 0.75rem;
-		padding: 0.15rem 0.4rem;
+		padding: 0.15rem 0.45rem;
 		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--fg);
-		background: var(--bg-soft);
+		border-radius: 6px;
+		color: var(--muted);
+		background: var(--surface-2);
 		cursor: pointer;
 		white-space: nowrap;
+		transition:
+			background 150ms ease,
+			border-color 150ms ease,
+			color 150ms ease;
 	}
 	.copy-btn:hover {
-		border-color: var(--muted);
+		border-color: var(--border-strong);
+		color: var(--fg);
 	}
 	.copy-btn.copied {
 		color: var(--ok-fg);

@@ -49,7 +49,7 @@
 {/if}
 
 {#if closed}
-	<div class="done-box">
+	<div class="done-box card">
 		<h2>〆を確定しました（{form && 'workDate' in form ? form.workDate : ''}）</h2>
 		{#if closed.length === 0}
 			<p class="muted">確定時間が入った明細はありません。</p>
@@ -74,58 +74,60 @@
 	<form method="POST" action="?/confirm" use:enhance>
 		<input type="hidden" name="date" value={draft.workDate} />
 		<input type="hidden" name="ticketIds" value={ticketIds} />
-		<table>
-			<thead>
-				<tr>
-					<th style="width:8rem">キー</th>
-					<th>タイトル</th>
-					<th style="width:6rem">計測</th>
-					<th style="width:7rem">確定時間</th>
-					<th style="width:5rem">進捗%</th>
-					<th style="width:10rem">ステータス</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each draft.rows as r (r.ticketId)}
+		<div class="table-card">
+			<table>
+				<thead>
 					<tr>
-						<td>
-							{#if r.jiraUrl}
-								<a href={r.jiraUrl} target="_blank" rel="noopener">{r.ticketKey}</a>
-							{:else}
-								{r.ticketKey}
-							{/if}
-						</td>
-						<td>{r.title}</td>
-						<td class="time-cell muted">{formatHMS(r.measuredSeconds)}</td>
-						<td>
-							<input
-								class="dur-input"
-								name={`final_${r.ticketId}`}
-								value={formatHM(r.initialFinalSeconds)}
-								placeholder="h:mm"
-							/>
-						</td>
-						<td>
-							<input
-								class="num-input"
-								type="number"
-								name={`progress_${r.ticketId}`}
-								value={r.progress}
-								min="0"
-								max="100"
-							/>
-						</td>
-						<td>
-							<select name={`status_${r.ticketId}`} value={r.statusId}>
-								{#each data.statuses as s (s.id)}
-									<option value={s.id}>{s.name}</option>
-								{/each}
-							</select>
-						</td>
+						<th style="width:8rem">キー</th>
+						<th>タイトル</th>
+						<th style="width:6rem">計測</th>
+						<th style="width:7rem">確定時間</th>
+						<th style="width:5rem">進捗%</th>
+						<th style="width:10rem">ステータス</th>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{#each draft.rows as r (r.ticketId)}
+						<tr>
+							<td>
+								{#if r.jiraUrl}
+									<a href={r.jiraUrl} target="_blank" rel="noopener">{r.ticketKey}</a>
+								{:else}
+									{r.ticketKey}
+								{/if}
+							</td>
+							<td>{r.title}</td>
+							<td class="time-cell muted">{formatHMS(r.measuredSeconds)}</td>
+							<td>
+								<input
+									class="dur-input"
+									name={`final_${r.ticketId}`}
+									value={formatHM(r.initialFinalSeconds)}
+									placeholder="h:mm"
+								/>
+							</td>
+							<td>
+								<input
+									class="num-input"
+									type="number"
+									name={`progress_${r.ticketId}`}
+									value={r.progress}
+									min="0"
+									max="100"
+								/>
+							</td>
+							<td>
+								<select name={`status_${r.ticketId}`} value={r.statusId}>
+									{#each data.statuses as s (s.id)}
+										<option value={s.id}>{s.name}</option>
+									{/each}
+								</select>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 
 		<div class="confirm-bar">
 			<button type="submit" class="btn btn-primary" disabled={draft.hasRunning}>
@@ -152,25 +154,19 @@
 		gap: 0.4rem;
 		font-size: 0.9rem;
 	}
-	.date-bar input {
-		padding: 0.3rem 0.4rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
-	}
 	.badge.closed {
 		font-size: 0.85rem;
 		color: var(--warn-fg);
 		background: var(--warn-bg);
 		border: 1px solid var(--warn-border);
-		padding: 0.2rem 0.5rem;
-		border-radius: 6px;
+		padding: 0.2rem 0.6rem;
+		border-radius: 999px;
 	}
 	.warn {
 		color: var(--warn-fg);
 		background: var(--warn-bg);
 		border: 1px solid var(--warn-border);
-		border-radius: 8px;
+		border-radius: var(--radius-m);
 		padding: 0.75rem 1rem;
 		margin-bottom: 1rem;
 	}
@@ -178,10 +174,6 @@
 		margin: 0 0 0.5rem;
 	}
 	.done-box {
-		background: var(--bg-soft);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		padding: 0.75rem 1rem;
 		margin-bottom: 1.25rem;
 	}
 	.done-box h2 {
@@ -197,18 +189,10 @@
 	}
 	.dur-input {
 		width: 5rem;
-		padding: 0.3rem 0.4rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
 		font-variant-numeric: tabular-nums;
 	}
 	.num-input {
-		width: 4rem;
-		padding: 0.3rem 0.4rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
+		width: 4.5rem;
 	}
 	.confirm-bar {
 		margin-top: 1rem;

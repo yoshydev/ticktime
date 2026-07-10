@@ -1,29 +1,48 @@
 :root {
 	color-scheme: dark; /* ネイティブUI（select・スクロールバー等）もダーク化 */
-	--bg: #16181d;
-	--bg-soft: #23262d;
-	--fg: #e3e5e8;
-	--muted: #9aa1ab;
-	--border: #3a3f48;
-	--accent: #4d8dff; /* ダーク背景でのコントラスト確保のため明るめに */
-	--accent-hover: #6ba1ff;
+
+	/* ===== デザイントークン（Linear風ダークパレット） ===== */
+	--bg: #0e0f13; /* 地 */
+	--surface: #16171d; /* カード面 */
+	--surface-2: #1d1f27; /* ホバー・インセット面 */
+	--fg: #eceef2;
+	--muted: #8b90a0;
+	--border: #262933;
+	--border-strong: #333747;
+
+	/* アクセント（インディゴ） */
+	--accent: #7c6cf0;
+	--accent-hover: #9186f4;
+	--accent-soft: rgba(124, 108, 240, 0.14);
+
+	/* 危険系（削除・停止） */
 	--danger: #e5484d;
 	--danger-hover: #f2555a;
-	/* アラート系（ダーク用: 暗い背景+明るい文字） */
-	--warn-fg: #e8b968;
-	--warn-bg: #2e2617;
-	--warn-border: #6b5426;
-	--error-fg: #ff8a80;
-	--error-bg: #2e1a18;
-	--error-border: #6e332e;
-	--ok-fg: #7ed99a;
-	--ok-bg: #16281c;
-	--ok-border: #2e5c3c;
+
+	/* セマンティック色（新パレットに調和） */
+	--warn-fg: #e5b567;
+	--warn-bg: rgba(229, 181, 103, 0.1);
+	--warn-border: rgba(229, 181, 103, 0.35);
+	--error-fg: #f0716c;
+	--error-bg: rgba(240, 113, 108, 0.1);
+	--error-border: rgba(240, 113, 108, 0.35);
+	--ok-fg: #5fd39a;
+	--ok-bg: rgba(95, 211, 154, 0.1);
+	--ok-border: rgba(95, 211, 154, 0.35);
 	--on-accent: #fff; /* accent/danger ボタン上の文字色 */
+
+	/* 角丸・シャドウ */
+	--radius-s: 8px;
+	--radius-m: 12px;
+	--radius-l: 16px;
+	--shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.2);
+
 	font-family:
+		'Inter Variable',
 		system-ui,
 		-apple-system,
 		'Segoe UI',
+		'Yu Gothic UI',
 		'Hiragino Kaku Gothic ProN',
 		Meiryo,
 		sans-serif;
@@ -31,6 +50,11 @@
 
 * {
 	box-sizing: border-box;
+}
+
+html {
+	/* 本文が短いページでもキャンバス全体を地色で塗る */
+	background: var(--bg);
 }
 
 body {
@@ -43,103 +67,205 @@ body {
 a {
 	color: var(--accent);
 }
+a:hover {
+	color: var(--accent-hover);
+}
+
+h1 {
+	font-size: 1.4rem;
+	font-weight: 650;
+	letter-spacing: -0.01em;
+}
 
 .container {
 	max-width: 1200px;
 	margin: 0 auto;
-	padding: 1rem 1.25rem 4rem;
+	padding: 1.25rem 1.25rem 4rem;
 }
 
+/* ===== ヘッダー ===== */
 .app-header {
 	position: sticky;
 	top: 0;
 	z-index: 10;
-	background: var(--bg);
+	background: rgba(14, 15, 19, 0.75);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
 	border-bottom: 1px solid var(--border);
 }
 
 .app-header .bar {
 	max-width: 1200px;
 	margin: 0 auto;
-	padding: 0.5rem 1.25rem;
+	padding: 0.55rem 1.25rem;
 	display: flex;
 	align-items: center;
 	gap: 1rem;
 	flex-wrap: wrap;
 }
 
+.wordmark {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--fg);
+	text-decoration: none;
+	white-space: nowrap;
+}
+.wordmark:hover {
+	color: var(--fg);
+}
+.wordmark .mark {
+	color: var(--accent);
+}
+
+/* ナビ（ピル型リンク） */
 .app-nav {
 	display: flex;
-	gap: 0.75rem;
+	gap: 0.25rem;
 	flex-wrap: wrap;
 }
 
 .app-nav a {
 	text-decoration: none;
-	padding: 0.2rem 0.35rem;
-	color: var(--fg);
-	border-radius: 4px;
+	padding: 0.3rem 0.75rem;
+	color: var(--muted);
+	border-radius: 999px;
+	font-size: 0.9rem;
+	transition:
+		background 150ms ease,
+		color 150ms ease;
 }
 .app-nav a:hover {
-	background: var(--bg-soft);
+	background: var(--surface-2);
+	color: var(--fg);
+}
+.app-nav a[aria-current='page'] {
+	background: var(--accent-soft);
+	color: var(--accent);
 }
 
+/* 計測中バッジ（ピル型） */
 .running-badge {
 	margin-left: auto;
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
-	padding: 0.25rem 0.6rem;
-	color: var(--warn-fg);
-	background: var(--warn-bg);
-	border: 1px solid var(--warn-border);
-	border-radius: 6px;
-	font-size: 0.9rem;
+	gap: 0.55rem;
+	padding: 0.3rem 0.5rem 0.3rem 0.8rem;
+	color: var(--accent);
+	background: var(--accent-soft);
+	border: 1px solid transparent;
+	border-radius: 999px;
+	font-size: 0.88rem;
 }
 .running-badge.idle {
-	background: var(--bg-soft);
+	padding: 0.3rem 0.8rem;
+	background: var(--surface-2);
 	border-color: var(--border);
 	color: var(--muted);
 }
 .running-badge .key {
 	font-weight: 600;
 }
+.running-badge .live-dot {
+	flex: none;
+	width: 0.5rem;
+	height: 0.5rem;
+	border-radius: 50%;
+	background: var(--accent);
+	animation: live-pulse 1.2s ease-in-out infinite;
+}
 
+@keyframes live-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.25;
+	}
+}
+
+/* ===== ボタン ===== */
 button {
 	font: inherit;
 }
 
 .btn {
-	padding: 0.3rem 0.7rem;
+	padding: 0.35rem 0.75rem;
 	border: 1px solid var(--border);
-	border-radius: 5px;
+	border-radius: var(--radius-s);
 	color: var(--fg);
-	background: var(--bg-soft);
+	background: var(--surface-2);
 	cursor: pointer;
 	white-space: nowrap;
+	transition:
+		background 150ms ease,
+		border-color 150ms ease,
+		box-shadow 150ms ease;
 }
 .btn:hover {
-	border-color: var(--muted);
+	border-color: var(--border-strong);
+	background: var(--surface);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 .btn-primary {
 	background: var(--accent);
 	color: var(--on-accent);
-	border-color: var(--accent);
+	border-color: transparent;
+	box-shadow:
+		0 0 0 1px rgba(124, 108, 240, 0.4),
+		0 2px 8px rgba(124, 108, 240, 0.25);
 }
 .btn-primary:hover {
 	background: var(--accent-hover);
-	border-color: var(--accent-hover);
+	border-color: transparent;
 }
-.btn-stop {
+.btn-danger {
 	background: var(--danger);
 	color: var(--on-accent);
-	border-color: var(--danger);
+	border-color: transparent;
 }
-.btn-stop:hover {
+.btn-danger:hover {
 	background: var(--danger-hover);
-	border-color: var(--danger-hover);
+	border-color: transparent;
 }
 
+/* ===== フォーカスリング ===== */
+:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 2px;
+}
+input:focus-visible,
+select:focus-visible {
+	outline: none;
+}
+
+/* ===== カード ===== */
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-card);
+	padding: 1rem 1.25rem;
+}
+
+/* テーブルを包むカード（横スクロール保持のため overflow-x のみ） */
+.table-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-card);
+	padding: 0;
+	overflow-x: auto;
+}
+
+/* ===== テーブル ===== */
 table {
 	width: 100%;
 	border-collapse: collapse;
@@ -147,19 +273,40 @@ table {
 th,
 td {
 	text-align: left;
-	padding: 0.5rem 0.6rem;
+	padding: 0.55rem 0.75rem;
 	border-bottom: 1px solid var(--border);
 	vertical-align: middle;
 }
 th {
-	font-size: 0.8rem;
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
 	color: var(--muted);
 	font-weight: 600;
+	white-space: nowrap;
+}
+/* カード内テーブル: 角丸に収め、最終行の罫線を消し、行ホバーを付ける */
+.table-card table {
+	border-radius: inherit;
+}
+.table-card tbody tr:last-child td {
+	border-bottom: none;
+}
+.table-card tbody tr:hover {
+	background: var(--surface-2);
+}
+.table-card th:first-child,
+.table-card td:first-child {
+	padding-left: 1rem;
+}
+.table-card th:last-child,
+.table-card td:last-child {
+	padding-right: 1rem;
 }
 
 .group-title {
-	margin: 1.5rem 0 0.25rem;
-	font-size: 0.95rem;
+	margin: 1.75rem 0 0.5rem;
+	font-size: 0.9rem;
+	font-weight: 600;
 	color: var(--muted);
 }
 
@@ -172,46 +319,52 @@ th {
 	white-space: nowrap;
 }
 
+/* ===== フォーム部品 ===== */
+input,
+select {
+	padding: 0.35rem 0.55rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-s);
+	font: inherit;
+	background: var(--surface-2);
+	color: var(--fg);
+	transition:
+		border-color 150ms ease,
+		box-shadow 150ms ease;
+}
+input:focus,
+select:focus {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .add-form {
 	display: flex;
-	gap: 0.5rem;
+	gap: 0.6rem;
 	flex-wrap: wrap;
 	align-items: flex-end;
 	margin: 1.5rem 0;
-	padding: 1rem;
-	background: var(--bg-soft);
-	border-radius: 8px;
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-card);
+	padding: 1rem 1.25rem;
 }
 .add-form label {
 	display: flex;
 	flex-direction: column;
 	font-size: 0.8rem;
-	gap: 0.2rem;
+	gap: 0.25rem;
 	color: var(--muted);
 }
-.add-form input {
-	padding: 0.35rem 0.5rem;
-	border: 1px solid var(--border);
-	border-radius: 5px;
-	font: inherit;
-}
 
-input,
-select {
-	padding: 0.3rem 0.4rem;
-	border: 1px solid var(--border);
-	border-radius: 5px;
-	font: inherit;
-	background: var(--bg-soft);
-	color: var(--fg);
-}
-
+/* ===== アラート ===== */
 .error {
 	color: var(--error-fg);
 	background: var(--error-bg);
 	border: 1px solid var(--error-border);
 	padding: 0.5rem 0.75rem;
-	border-radius: 6px;
+	border-radius: var(--radius-s);
 }
 
 .ok {
@@ -219,13 +372,55 @@ select {
 	background: var(--ok-bg);
 	border: 1px solid var(--ok-border);
 	padding: 0.4rem 0.7rem;
-	border-radius: 6px;
+	border-radius: var(--radius-s);
 }
 
-.day-total {
-	margin-top: 1.5rem;
-	font-size: 1.05rem;
+/* ===== サマリーカード（今日ページ等） ===== */
+.summary-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(180px, 1fr));
+	gap: 0.75rem;
+	margin: 1rem 0 1.5rem;
 }
-.day-total strong {
+@media (max-width: 720px) {
+	.summary-grid {
+		grid-template-columns: 1fr;
+	}
+}
+.summary-card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-card);
+	padding: 0.85rem 1.1rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+}
+.summary-card .label {
+	font-size: 0.72rem;
+	letter-spacing: 0.06em;
+	color: var(--muted);
+	font-weight: 600;
+}
+.summary-card .value {
+	font-size: 1.6rem;
+	font-weight: 650;
+	letter-spacing: -0.01em;
 	font-variant-numeric: tabular-nums;
+	line-height: 1.2;
+}
+.summary-card .sub {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
+
+/* ===== モーション低減 ===== */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		transition: none !important;
+		animation: none !important;
+	}
 }

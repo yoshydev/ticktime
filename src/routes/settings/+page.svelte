@@ -39,7 +39,7 @@
 	{#if errorFor('general')}
 		<p class="error">{errorFor('general')}</p>
 	{/if}
-	<form method="POST" action="?/saveGeneral" use:enhance class="settings-form">
+	<form method="POST" action="?/saveGeneral" use:enhance class="settings-form card">
 		<label>
 			氏名
 			<input name="user_name" value={s.user_name ?? ''} />
@@ -119,53 +119,55 @@
 		<p class="error">{errorFor('status')}</p>
 	{/if}
 
-	<table>
-		<thead>
-			<tr>
-				<th>名前</th>
-				<th style="width:11rem">区分</th>
-				<th style="width:6rem">並び順</th>
-				<th style="width:11rem"></th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each data.statuses as st (st.id)}
+	<div class="table-card">
+		<table>
+			<thead>
 				<tr>
-					<td>
-						<form method="POST" action="?/updateStatus" use:enhance id={`upd-${st.id}`}>
-							<input type="hidden" name="id" value={st.id} />
-							<input name="name" value={st.name} />
-						</form>
-					</td>
-					<td>
-						<select name="kind" value={st.kind} form={`upd-${st.id}`}>
-							<option value="active">active</option>
-							<option value="pending">pending</option>
-							<option value="done">done</option>
-						</select>
-					</td>
-					<td>
-						<input
-							class="num-input"
-							type="number"
-							name="sortOrder"
-							value={st.sortOrder}
-							form={`upd-${st.id}`}
-						/>
-					</td>
-					<td class="row-actions">
-						<button type="submit" class="btn" form={`upd-${st.id}`}>更新</button>
-						<form method="POST" action="?/deleteStatus" use:enhance style="display:inline">
-							<input type="hidden" name="id" value={st.id} />
-							<button type="submit" class="btn btn-stop">削除</button>
-						</form>
-					</td>
+					<th>名前</th>
+					<th style="width:11rem">区分</th>
+					<th style="width:6rem">並び順</th>
+					<th style="width:11rem"></th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each data.statuses as st (st.id)}
+					<tr>
+						<td>
+							<form method="POST" action="?/updateStatus" use:enhance id={`upd-${st.id}`}>
+								<input type="hidden" name="id" value={st.id} />
+								<input name="name" value={st.name} />
+							</form>
+						</td>
+						<td>
+							<select name="kind" value={st.kind} form={`upd-${st.id}`}>
+								<option value="active">active</option>
+								<option value="pending">pending</option>
+								<option value="done">done</option>
+							</select>
+						</td>
+						<td>
+							<input
+								class="num-input"
+								type="number"
+								name="sortOrder"
+								value={st.sortOrder}
+								form={`upd-${st.id}`}
+							/>
+						</td>
+						<td class="row-actions">
+							<button type="submit" class="btn" form={`upd-${st.id}`}>更新</button>
+							<form method="POST" action="?/deleteStatus" use:enhance style="display:inline">
+								<input type="hidden" name="id" value={st.id} />
+								<button type="submit" class="btn btn-danger">削除</button>
+							</form>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 
-	<form method="POST" action="?/addStatus" use:enhance class="add-status">
+	<form method="POST" action="?/addStatus" use:enhance class="add-status card">
 		<label>
 			名前
 			<input name="name" placeholder="新しいステータス" required />
@@ -197,30 +199,32 @@
 		<button type="submit" class="btn">疎通確認する</button>
 	</form>
 	{#if jiraProbe}
-		<ul class="probe-result">
-			<li>
-				設定ファイル（<code>~/.config/jira/config</code>）:
-				<strong>{jiraProbe.configExists ? 'あり' : 'なし'}</strong>
-			</li>
-			<li>
-				認証情報（email/token）:
-				<strong>{jiraProbe.available ? '揃っている' : '不足'}</strong>
-			</li>
-			{#if jiraProbe.available}
+		<div class="probe-box card">
+			<ul class="probe-result">
 				<li>
-					myself プローブ:
-					{#if jiraProbe.probe}
-						<strong class:ng={!jiraProbe.probe.ok}>
-							{jiraProbe.probe.ok ? 'OK' : 'NG'}
-						</strong>
-						（HTTP {jiraProbe.probe.status ?? 'ネットワークエラー'}）
-					{:else}
-						—
-					{/if}
+					設定ファイル（<code>~/.config/jira/config</code>）:
+					<strong>{jiraProbe.configExists ? 'あり' : 'なし'}</strong>
 				</li>
-			{/if}
-		</ul>
-		<p class="hint muted">メールアドレス・API トークンは表示されません。</p>
+				<li>
+					認証情報（email/token）:
+					<strong>{jiraProbe.available ? '揃っている' : '不足'}</strong>
+				</li>
+				{#if jiraProbe.available}
+					<li>
+						myself プローブ:
+						{#if jiraProbe.probe}
+							<strong class:ng={!jiraProbe.probe.ok}>
+								{jiraProbe.probe.ok ? 'OK' : 'NG'}
+							</strong>
+							（HTTP {jiraProbe.probe.status ?? 'ネットワークエラー'}）
+						{:else}
+							—
+						{/if}
+					</li>
+				{/if}
+			</ul>
+			<p class="hint muted">メールアドレス・API トークンは表示されません。</p>
+		</div>
 	{/if}
 </section>
 
@@ -241,12 +245,6 @@
 		gap: 0.25rem;
 		color: var(--muted);
 	}
-	.settings-form input {
-		padding: 0.35rem 0.5rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
-	}
 	.settings-form .narrow input {
 		max-width: 8rem;
 	}
@@ -262,12 +260,6 @@
 		gap: 0.25rem;
 		color: var(--muted);
 	}
-	.entry-grid input {
-		padding: 0.35rem 0.5rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
-	}
 	.hint {
 		font-size: 0.8rem;
 		color: var(--muted);
@@ -275,10 +267,6 @@
 	}
 	.num-input {
 		width: 5rem;
-		padding: 0.3rem 0.4rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
 	}
 	.row-actions {
 		display: flex;
@@ -291,9 +279,6 @@
 		align-items: flex-end;
 		flex-wrap: wrap;
 		margin-top: 1rem;
-		padding: 1rem;
-		background: var(--bg-soft);
-		border-radius: 8px;
 	}
 	.add-status label {
 		display: flex;
@@ -302,14 +287,12 @@
 		gap: 0.2rem;
 		color: var(--muted);
 	}
-	.add-status input {
-		padding: 0.35rem 0.5rem;
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		font: inherit;
+	.probe-box {
+		margin-top: 0.75rem;
+		max-width: 640px;
 	}
 	.probe-result {
-		margin: 0.75rem 0 0.25rem;
+		margin: 0 0 0.25rem;
 		padding-left: 1.2rem;
 	}
 	.probe-result li {
