@@ -3,6 +3,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { listOpenTickets, addTicket, setStatus, type Ticket } from '$lib/server/repo/tickets';
 import { listStatuses } from '$lib/server/repo/settings';
 import { start, stop, secondsByTicketForDate, currentWorkDate } from '$lib/server/repo/sessions';
+import { isClosed } from '$lib/server/repo/closings';
 
 export interface TicketWithTime extends Ticket {
 	todaySeconds: number;
@@ -22,7 +23,8 @@ export const load: PageServerLoad = () => {
 		workDate,
 		tickets,
 		statuses: listStatuses(),
-		dayTotalSeconds
+		dayTotalSeconds,
+		closed: isClosed(workDate)
 	};
 };
 

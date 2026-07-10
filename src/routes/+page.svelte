@@ -114,7 +114,12 @@
 	<button type="submit" class="btn">追加</button>
 </form>
 
-<p class="day-total">今日の合計: <strong>{formatHMS(data.dayTotalSeconds)}</strong></p>
+<p class="day-total">
+	今日の合計: <strong>{formatHMS(data.dayTotalSeconds)}</strong>
+	{#if data.closed}
+		<span class="closed-tag">本日は〆済み</span>
+	{/if}
+</p>
 
 <p><a href="/close">〆処理へ →</a></p>
 
@@ -128,5 +133,15 @@
 		border: 1px solid #f5c6c2;
 		padding: 0.5rem 0.75rem;
 		border-radius: 6px;
+	}
+	.closed-tag {
+		margin-left: 0.75rem;
+		font-size: 0.8rem;
+		color: #8a5a00;
+		background: #fff5e6;
+		border: 1px solid #f0c674;
+		padding: 0.15rem 0.5rem;
+		border-radius: 6px;
+		vertical-align: middle;
 	}
 </style>
