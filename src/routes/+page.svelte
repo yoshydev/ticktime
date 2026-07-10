@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import { formatHMS, formatHM } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
+	import { statusColor } from '$lib/statusColor';
 	import type { PageServerData, ActionData } from './$types';
 
 	let { data, form }: { data: PageServerData; form: ActionData } = $props();
@@ -83,7 +84,7 @@
 			<tbody>
 				{#each group.tickets as t (t.id)}
 					<tr class:running={running?.ticketId === t.id}>
-						<td>
+						<td class="key-cell" style="border-left-color: {statusColor(t.statusId)}">
 							{#if t.jiraUrl}
 								<a href={t.jiraUrl} target="_blank" rel="noreferrer">{t.key}</a>
 							{:else}
@@ -95,8 +96,9 @@
 							<CopyButtons ticketKey={t.key} title={t.title} />
 						</td>
 						<td>
-							<form method="POST" action="?/setStatus" use:enhance>
+							<form method="POST" action="?/setStatus" use:enhance class="status-form">
 								<input type="hidden" name="ticketId" value={t.id} />
+								<span class="status-dot" style="background: {statusColor(t.statusId)}"></span>
 								<select
 									name="statusId"
 									value={t.statusId}
@@ -108,19 +110,22 @@
 								</select>
 							</form>
 						</td>
-						<td class="time-cell">{t.progress}%</td>
+						<td class="time-cell progress-cell">
+							<div>{t.progress}%</div>
+							<div class="progress-track">
+								<div class="progress-fill" style="width: {t.progress}%"></div>
+							</div>
+						</td>
 						<td class="time-cell">{formatHMS(t.todaySeconds)}</td>
 						<td>
-							<form method="POST" action="?/start" use:enhance>
-								<input type="hidden" name="ticketId" value={t.id} />
-								<button
-									type="submit"
-									class="btn btn-primary"
-									disabled={running?.ticketId === t.id}
-								>
-									▶ 開始
-								</button>
-							</form>
+							{#if running?.ticketId === t.id}
+								<span class="running-tag"><span class="live-dot"></span>計測中</span>
+							{:else}
+								<form method="POST" action="?/start" use:enhance>
+									<input type="hidden" name="ticketId" value={t.id} />
+									<button type="submit" class="btn btn-primary">▶ 開始</button>
+								</form>
+							{/if}
 						</td>
 					</tr>
 				{/each}
@@ -185,6 +190,67 @@
 <style>
 	tr.running {
 		background: var(--warn-bg);
+	}
+	tbody tr:not(.running):is(:hover, :focus-within) {
+		background: var(--bg-soft);
+	}
+	.key-cell {
+		border-left: 4px solid transparent;
+	}
+	.status-form {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+	}
+	.status-dot {
+		flex: none;
+		width: 0.6rem;
+		height: 0.6rem;
+		border-radius: 50%;
+	}
+	.progress-cell div:first-child {
+		font-size: 0.9rem;
+	}
+	.progress-track {
+		width: 100%;
+		height: 4px;
+		border-radius: 2px;
+		background: var(--border);
+		overflow: hidden;
+	}
+	.progress-fill {
+		height: 100%;
+		border-radius: 2px;
+		background: var(--accent);
+	}
+	.running-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		color: var(--warn-fg);
+		font-size: 0.9rem;
+		white-space: nowrap;
+	}
+	.live-dot {
+		width: 0.55rem;
+		height: 0.55rem;
+		border-radius: 50%;
+		background: var(--warn-fg);
+		animation: live-pulse 1.2s ease-in-out infinite;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.live-dot {
+			animation: none;
+		}
+	}
+	@keyframes live-pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.25;
+		}
 	}
 	.title-cell {
 		padding-top: 0.4rem;
