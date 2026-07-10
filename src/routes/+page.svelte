@@ -9,6 +9,41 @@
 
 	const running = $derived(page.data.running as { ticketId: number } | null);
 
+	// チケット追加フォームの入力（Jira 取得ボタンと双方向バインドするため $state で保持）
+	let keyInput = $state('');
+	let titleInput = $state('');
+	let jiraMsg = $state<string | null>(null);
+	let jiraLoading = $state(false);
+
+	/** 入力中のキーで /api/jira/<key> を叩き、成功したらタイトル欄へ反映する。 */
+	async function fetchJiraTitle() {
+		const key = keyInput.trim();
+		if (key === '') {
+			jiraMsg = 'チケット番号を入力してください';
+			return;
+		}
+		jiraLoading = true;
+		jiraMsg = null;
+		try {
+			const res = await fetch(`/api/jira/${encodeURIComponent(key)}`);
+			const body = (await res.json()) as { title?: string; error?: string };
+			if (res.ok && body.title) {
+				titleInput = body.title;
+				jiraMsg = null;
+			} else if (body.error === 'not_configured') {
+				jiraMsg = 'Jira 設定がありません。タイトルは手入力してください。';
+			} else if (body.error === 'invalid_key') {
+				jiraMsg = 'チケット番号の形式が不正です（例: TICKET-1234）';
+			} else {
+				jiraMsg = 'タイトルの取得に失敗しました。手入力してください。';
+			}
+		} catch {
+			jiraMsg = '取得中にエラーが発生しました。手入力してください。';
+		} finally {
+			jiraLoading = false;
+		}
+	}
+
 	const groups = $derived([
 		{
 			kind: 'active',
@@ -93,26 +128,42 @@
 	{/if}
 {/each}
 
-<form class="add-form" method="POST" action="?/addTicket" use:enhance>
+<form
+	class="add-form"
+	method="POST"
+	action="?/addTicket"
+	use:enhance={() => {
+		return async ({ result, update }) => {
+			await update();
+			if (result.type === 'success') {
+				keyInput = '';
+				titleInput = '';
+				jiraMsg = null;
+			}
+		};
+	}}
+>
 	<label>
 		チケット番号
-		<input
-			name="key"
-			placeholder="TICKET-1234"
-			required
-			value={form && 'key' in form ? (form.key ?? '') : ''}
-		/>
+		<input name="key" placeholder="TICKET-1234" required bind:value={keyInput} />
 	</label>
+	<button
+		type="button"
+		class="btn"
+		onclick={fetchJiraTitle}
+		disabled={jiraLoading || keyInput.trim() === ''}
+	>
+		{jiraLoading ? '取得中…' : 'Jiraから取得'}
+	</button>
 	<label>
 		タイトル（任意）
-		<input
-			name="title"
-			placeholder="未入力なら番号を仮タイトルに"
-			value={form && 'title' in form ? (form.title ?? '') : ''}
-		/>
+		<input name="title" placeholder="未入力なら番号を仮タイトルに" bind:value={titleInput} />
 	</label>
 	<button type="submit" class="btn">追加</button>
 </form>
+{#if jiraMsg}
+	<p class="jira-msg">{jiraMsg}</p>
+{/if}
 
 <p class="day-total">
 	今日の合計: <strong>{formatHMS(data.dayTotalSeconds)}</strong>
@@ -133,6 +184,11 @@
 		border: 1px solid #f5c6c2;
 		padding: 0.5rem 0.75rem;
 		border-radius: 6px;
+	}
+	.jira-msg {
+		margin: -0.5rem 0 0.5rem;
+		font-size: 0.85rem;
+		color: #8a5a00;
 	}
 	.closed-tag {
 		margin-left: 0.75rem;
