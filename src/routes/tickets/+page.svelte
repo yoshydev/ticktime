@@ -19,14 +19,13 @@
 	<table>
 		<thead>
 			<tr>
-				<th style="width:8rem">キー</th>
+				<th style="width:10rem">キー</th>
 				<th>タイトル</th>
 				<th style="width:12rem">Jira URL</th>
 				<th style="width:9rem">ステータス</th>
 				<th style="width:4rem">進捗</th>
 				<th style="width:6rem">累計</th>
 				<th style="width:7rem">作成日</th>
-				<th style="width:15rem">コピー</th>
 				<th style="width:5rem">操作</th>
 			</tr>
 		</thead>
@@ -40,7 +39,10 @@
 						</form>
 						<input class="text-input" form={formId} name="key" value={t.key} />
 					</td>
-					<td><input class="text-input" form={formId} name="title" value={t.title} /></td>
+					<td class="title-cell">
+						<input class="text-input" form={formId} name="title" value={t.title} />
+						<CopyButtons ticketKey={t.key} title={t.title} />
+					</td>
 					<td>
 						<input
 							class="text-input"
@@ -70,7 +72,6 @@
 					</td>
 					<td class="time-cell">{formatHMS(t.totalSeconds)}</td>
 					<td>{new Date(t.createdAt).toLocaleDateString('ja-JP')}</td>
-					<td><CopyButtons ticketKey={t.key} title={t.title} /></td>
 					<td>
 						<button type="submit" form={formId} class="btn">保存</button>
 						{#if t.referenced}
@@ -97,12 +98,10 @@
 <p><a href="/">今日へ戻る →</a></p>
 
 <style>
-	.error {
-		color: #c0392b;
-		background: #fdecea;
-		border: 1px solid #f5c6c2;
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
+	.title-cell {
+		min-width: 14rem;
+		padding-top: 0.4rem;
+		padding-bottom: 0.4rem;
 	}
 	.text-input {
 		width: 100%;
@@ -126,6 +125,6 @@
 		font: inherit;
 	}
 	.btn-danger {
-		color: #c0392b;
+		color: var(--danger);
 	}
 </style>

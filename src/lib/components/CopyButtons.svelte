@@ -41,23 +41,27 @@
 
 <style>
 	.copy-buttons {
-		display: inline-flex;
+		display: flex;
+		flex-wrap: wrap;
 		gap: 0.25rem;
+		margin-top: 0.25rem;
 	}
 	.copy-btn {
 		font-size: 0.75rem;
 		padding: 0.15rem 0.4rem;
-		border: 1px solid #ccc;
+		border: 1px solid var(--border);
 		border-radius: 4px;
-		background: #f7f7f7;
+		color: var(--fg);
+		background: var(--bg-soft);
 		cursor: pointer;
 		white-space: nowrap;
 	}
 	.copy-btn:hover {
-		background: #ececec;
+		border-color: var(--muted);
 	}
 	.copy-btn.copied {
-		background: #d7f5dd;
-		border-color: #46b361;
+		color: var(--ok-fg);
+		background: var(--ok-bg);
+		border-color: var(--ok-border);
 	}
 </style>

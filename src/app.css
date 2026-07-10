@@ -1,9 +1,25 @@
 :root {
-	--fg: #1a1a1a;
-	--muted: #666;
-	--border: #ddd;
-	--accent: #2f6feb;
-	--bg-soft: #f6f7f9;
+	color-scheme: dark; /* ネイティブUI（select・スクロールバー等）もダーク化 */
+	--bg: #16181d;
+	--bg-soft: #23262d;
+	--fg: #e3e5e8;
+	--muted: #9aa1ab;
+	--border: #3a3f48;
+	--accent: #4d8dff; /* ダーク背景でのコントラスト確保のため明るめに */
+	--accent-hover: #6ba1ff;
+	--danger: #e5484d;
+	--danger-hover: #f2555a;
+	/* アラート系（ダーク用: 暗い背景+明るい文字） */
+	--warn-fg: #e8b968;
+	--warn-bg: #2e2617;
+	--warn-border: #6b5426;
+	--error-fg: #ff8a80;
+	--error-bg: #2e1a18;
+	--error-border: #6e332e;
+	--ok-fg: #7ed99a;
+	--ok-bg: #16281c;
+	--ok-border: #2e5c3c;
+	--on-accent: #fff; /* accent/danger ボタン上の文字色 */
 	font-family:
 		system-ui,
 		-apple-system,
@@ -20,7 +36,7 @@
 body {
 	margin: 0;
 	color: var(--fg);
-	background: #fff;
+	background: var(--bg);
 	line-height: 1.5;
 }
 
@@ -29,7 +45,7 @@ a {
 }
 
 .container {
-	max-width: 960px;
+	max-width: 1200px;
 	margin: 0 auto;
 	padding: 1rem 1.25rem 4rem;
 }
@@ -38,12 +54,12 @@ a {
 	position: sticky;
 	top: 0;
 	z-index: 10;
-	background: #fff;
+	background: var(--bg);
 	border-bottom: 1px solid var(--border);
 }
 
 .app-header .bar {
-	max-width: 960px;
+	max-width: 1200px;
 	margin: 0 auto;
 	padding: 0.5rem 1.25rem;
 	display: flex;
@@ -74,8 +90,9 @@ a {
 	align-items: center;
 	gap: 0.5rem;
 	padding: 0.25rem 0.6rem;
-	background: #fff5e6;
-	border: 1px solid #f0c674;
+	color: var(--warn-fg);
+	background: var(--warn-bg);
+	border: 1px solid var(--warn-border);
 	border-radius: 6px;
 	font-size: 0.9rem;
 }
@@ -96,27 +113,31 @@ button {
 	padding: 0.3rem 0.7rem;
 	border: 1px solid var(--border);
 	border-radius: 5px;
-	background: #fff;
+	color: var(--fg);
+	background: var(--bg-soft);
 	cursor: pointer;
+	white-space: nowrap;
 }
 .btn:hover {
-	background: var(--bg-soft);
+	border-color: var(--muted);
 }
 .btn-primary {
 	background: var(--accent);
-	color: #fff;
+	color: var(--on-accent);
 	border-color: var(--accent);
 }
 .btn-primary:hover {
-	background: #2258c9;
+	background: var(--accent-hover);
+	border-color: var(--accent-hover);
 }
 .btn-stop {
-	background: #e5484d;
-	color: #fff;
-	border-color: #e5484d;
+	background: var(--danger);
+	color: var(--on-accent);
+	border-color: var(--danger);
 }
 .btn-stop:hover {
-	background: #c93a3e;
+	background: var(--danger-hover);
+	border-color: var(--danger-hover);
 }
 
 table {
@@ -175,11 +196,30 @@ th {
 	font: inherit;
 }
 
+input,
 select {
-	padding: 0.25rem 0.35rem;
+	padding: 0.3rem 0.4rem;
 	border: 1px solid var(--border);
 	border-radius: 5px;
 	font: inherit;
+	background: var(--bg-soft);
+	color: var(--fg);
+}
+
+.error {
+	color: var(--error-fg);
+	background: var(--error-bg);
+	border: 1px solid var(--error-border);
+	padding: 0.5rem 0.75rem;
+	border-radius: 6px;
+}
+
+.ok {
+	color: var(--ok-fg);
+	background: var(--ok-bg);
+	border: 1px solid var(--ok-border);
+	padding: 0.4rem 0.7rem;
+	border-radius: 6px;
 }
 
 .day-total {

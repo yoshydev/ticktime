@@ -160,28 +160,22 @@
 	}
 	.badge.closed {
 		font-size: 0.85rem;
-		color: #8a5a00;
-		background: #fff5e6;
-		border: 1px solid #f0c674;
+		color: var(--warn-fg);
+		background: var(--warn-bg);
+		border: 1px solid var(--warn-border);
 		padding: 0.2rem 0.5rem;
 		border-radius: 6px;
 	}
 	.warn {
-		background: #fff5e6;
-		border: 1px solid #f0c674;
+		color: var(--warn-fg);
+		background: var(--warn-bg);
+		border: 1px solid var(--warn-border);
 		border-radius: 8px;
 		padding: 0.75rem 1rem;
 		margin-bottom: 1rem;
 	}
 	.warn p {
 		margin: 0 0 0.5rem;
-	}
-	.error {
-		color: #c0392b;
-		background: #fdecea;
-		border: 1px solid #f5c6c2;
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
 	}
 	.done-box {
 		background: var(--bg-soft);

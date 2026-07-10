@@ -316,20 +316,6 @@
 		margin: 0.2rem 0;
 	}
 	.probe-result .ng {
-		color: #c0392b;
-	}
-	.ok {
-		color: #1e7a3c;
-		background: #e7f6ec;
-		border: 1px solid #a9dcbb;
-		padding: 0.4rem 0.7rem;
-		border-radius: 6px;
-	}
-	.error {
-		color: #c0392b;
-		background: #fdecea;
-		border: 1px solid #f5c6c2;
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
+		color: var(--error-fg);
 	}
 </style>

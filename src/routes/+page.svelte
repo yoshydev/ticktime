@@ -72,13 +72,12 @@
 		<table>
 			<thead>
 				<tr>
-					<th style="width:8rem">キー</th>
+					<th style="width:10rem">キー</th>
 					<th>タイトル</th>
 					<th style="width:9rem">ステータス</th>
 					<th style="width:4rem">進捗</th>
 					<th style="width:6rem">今日</th>
 					<th style="width:5rem">計測</th>
-					<th style="width:15rem">コピー</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -91,7 +90,10 @@
 								{t.key}
 							{/if}
 						</td>
-						<td>{t.title}</td>
+						<td class="title-cell">
+							<div>{t.title}</div>
+							<CopyButtons ticketKey={t.key} title={t.title} />
+						</td>
 						<td>
 							<form method="POST" action="?/setStatus" use:enhance>
 								<input type="hidden" name="ticketId" value={t.id} />
@@ -120,7 +122,6 @@
 								</button>
 							</form>
 						</td>
-						<td><CopyButtons ticketKey={t.key} title={t.title} /></td>
 					</tr>
 				{/each}
 			</tbody>
@@ -183,33 +184,31 @@
 
 <style>
 	tr.running {
-		background: #fff8e6;
+		background: var(--warn-bg);
 	}
-	.error {
-		color: #c0392b;
-		background: #fdecea;
-		border: 1px solid #f5c6c2;
-		padding: 0.5rem 0.75rem;
-		border-radius: 6px;
+	.title-cell {
+		padding-top: 0.4rem;
+		padding-bottom: 0.4rem;
 	}
 	.jira-msg {
 		margin: -0.5rem 0 0.5rem;
 		font-size: 0.85rem;
-		color: #8a5a00;
+		color: var(--warn-fg);
 	}
 	.closed-tag {
 		margin-left: 0.75rem;
 		font-size: 0.8rem;
-		color: #8a5a00;
-		background: #fff5e6;
-		border: 1px solid #f0c674;
+		color: var(--warn-fg);
+		background: var(--warn-bg);
+		border: 1px solid var(--warn-border);
 		padding: 0.15rem 0.5rem;
 		border-radius: 6px;
 		vertical-align: middle;
 	}
 	.reclose-banner {
-		background: #fff5e6;
-		border: 1px solid #f0c674;
+		color: var(--warn-fg);
+		background: var(--warn-bg);
+		border: 1px solid var(--warn-border);
 		border-radius: 8px;
 		padding: 0.75rem 1rem;
 		margin-bottom: 1rem;
