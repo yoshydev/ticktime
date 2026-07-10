@@ -3,6 +3,11 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	server: {
+		// 多重起動防止: 5173が使用中なら別ポートへ逃げず即エラー終了させる
+		// （複数のvite devが .svelte-kit/generated を取り合うと504 Outdated Requestで壊れるため）
+		strictPort: true
+	},
 	plugins: [
 		sveltekit({
 			compilerOptions: {
