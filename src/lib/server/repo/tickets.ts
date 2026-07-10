@@ -11,6 +11,7 @@ export interface Ticket {
 	statusKind: 'active' | 'pending' | 'done';
 	progress: number;
 	importedSeconds: number;
+	createdAt: number;
 }
 
 interface TicketRow {
@@ -23,6 +24,7 @@ interface TicketRow {
 	status_kind: Ticket['statusKind'];
 	progress: number;
 	imported_seconds: number;
+	created_at: number;
 }
 
 function mapRow(r: TicketRow): Ticket {
@@ -35,12 +37,13 @@ function mapRow(r: TicketRow): Ticket {
 		statusName: r.status_name,
 		statusKind: r.status_kind,
 		progress: r.progress,
-		importedSeconds: r.imported_seconds
+		importedSeconds: r.imported_seconds,
+		createdAt: r.created_at
 	};
 }
 
 const SELECT_BASE = `
-  SELECT t.id, t.key, t.title, t.jira_url, t.status_id, t.progress, t.imported_seconds,
+  SELECT t.id, t.key, t.title, t.jira_url, t.status_id, t.progress, t.imported_seconds, t.created_at,
          s.name AS status_name, s.kind AS status_kind
   FROM tickets t
   JOIN statuses s ON s.id = t.status_id
@@ -123,6 +126,64 @@ export function setStatus(ticketId: number, statusId: number): void {
 	getDb()
 		.prepare('UPDATE tickets SET status_id = ?, updated_at = ? WHERE id = ?')
 		.run(statusId, Date.now(), ticketId);
+}
+
+/**
+ * チケットを更新する（キー・タイトル・Jira URL・ステータス・進捗）。
+ * key/title は trim 必須（title が空なら key を仮タイトルにする、addTicket と同様の方針）。
+ * key の UNIQUE 制約違反はそのまま throw する（呼び出し側でメッセージ変換する）。
+ */
+export function updateTicket(input: {
+	id: number;
+	key: string;
+	title: string;
+	jiraUrl: string | null;
+	statusId: number;
+	progress: number;
+}): void {
+	const key = input.key.trim();
+	if (key === '') throw new Error('チケット番号は必須です');
+	const title = input.title.trim() || key;
+	getDb()
+		.prepare(
+			`UPDATE tickets SET key = ?, title = ?, jira_url = ?, status_id = ?, progress = ?, updated_at = ?
+			 WHERE id = ?`
+		)
+		.run(key, title, input.jiraUrl, input.statusId, input.progress, Date.now(), input.id);
+}
+
+/** 指定チケットが sessions または daily_entries から参照されているか（計測履歴の有無）。 */
+export function isTicketReferenced(id: number): boolean {
+	const db = getDb();
+	const inSessions = db.prepare('SELECT 1 FROM sessions WHERE ticket_id = ? LIMIT 1').get(id);
+	if (inSessions) return true;
+	const inEntries = db.prepare('SELECT 1 FROM daily_entries WHERE ticket_id = ? LIMIT 1').get(id);
+	return !!inEntries;
+}
+
+/** sessions / daily_entries から参照されている ticket_id をまとめて返す。 */
+export function referencedTicketIds(): Set<number> {
+	const db = getDb();
+	const ids = new Set<number>();
+	for (const r of db.prepare('SELECT DISTINCT ticket_id AS id FROM sessions').all() as {
+		id: number;
+	}[]) {
+		ids.add(r.id);
+	}
+	for (const r of db.prepare('SELECT DISTINCT ticket_id AS id FROM daily_entries').all() as {
+		id: number;
+	}[]) {
+		ids.add(r.id);
+	}
+	return ids;
+}
+
+/** チケットを削除する。計測履歴（sessions/daily_entries）があれば削除不可としてエラーを投げる。 */
+export function deleteTicket(id: number): void {
+	if (isTicketReferenced(id)) {
+		throw new Error('このチケットは計測履歴があるため削除できません');
+	}
+	getDb().prepare('DELETE FROM tickets WHERE id = ?').run(id);
 }
 
 /** チケット別累計時間の1行。 */
