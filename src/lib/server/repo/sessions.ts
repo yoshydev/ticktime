@@ -86,3 +86,11 @@ export function secondsByTicketForDate(workDate: string): Map<number, number> {
 export function currentWorkDate(): string {
 	return toWorkDate(Date.now(), getBoundaryHour());
 }
+
+/** 対象業務日付で、指定タイムスタンプより後に開始したセッションが存在するか。 */
+export function hasSessionStartedAfter(workDate: string, timestamp: number): boolean {
+	const row = getDb()
+		.prepare('SELECT 1 FROM sessions WHERE work_date = ? AND started_at > ? LIMIT 1')
+		.get(workDate, timestamp);
+	return !!row;
+}

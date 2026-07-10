@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
-	import { formatHMS } from '$lib/duration';
+	import { formatHMS, formatHM } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
 	import type { PageServerData, ActionData } from './$types';
 
@@ -165,6 +165,13 @@
 	<p class="jira-msg">{jiraMsg}</p>
 {/if}
 
+{#if data.reclosingBanner}
+	<div class="reclose-banner">
+		本日は〆済みです。追加作業があります（+{formatHM(data.reclosingBanner.extraSeconds)}）。
+		<a href="/close">再〆へ →</a>
+	</div>
+{/if}
+
 <p class="day-total">
 	今日の合計: <strong>{formatHMS(data.dayTotalSeconds)}</strong>
 	{#if data.closed}
@@ -199,5 +206,12 @@
 		padding: 0.15rem 0.5rem;
 		border-radius: 6px;
 		vertical-align: middle;
+	}
+	.reclose-banner {
+		background: #fff5e6;
+		border: 1px solid #f0c674;
+		border-radius: 8px;
+		padding: 0.75rem 1rem;
+		margin-bottom: 1rem;
 	}
 </style>

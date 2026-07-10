@@ -400,3 +400,20 @@ export function getClosingDetail(
 export function isClosed(workDate: string): boolean {
 	return findClosing(workDate) !== null;
 }
+
+/**
+ * 対象業務日付の〆情報を返す（〆済みなら closedAt と daily_entries.measured_seconds 合計）。
+ * 未〆なら null。今日ページの「再〆が必要か」判定に使う。
+ */
+export function getClosingInfo(
+	workDate: string
+): { closedAt: number; measuredTotalSeconds: number } | null {
+	const closing = findClosing(workDate);
+	if (!closing) return null;
+	const row = getDb()
+		.prepare(
+			'SELECT COALESCE(SUM(measured_seconds), 0) AS total FROM daily_entries WHERE closing_id = ?'
+		)
+		.get(closing.id) as { total: number };
+	return { closedAt: closing.closed_at, measuredTotalSeconds: row.total };
+}

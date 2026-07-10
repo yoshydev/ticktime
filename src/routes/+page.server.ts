@@ -2,8 +2,14 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { listOpenTickets, addTicket, setStatus, type Ticket } from '$lib/server/repo/tickets';
 import { listStatuses } from '$lib/server/repo/settings';
-import { start, stop, secondsByTicketForDate, currentWorkDate } from '$lib/server/repo/sessions';
-import { isClosed } from '$lib/server/repo/closings';
+import {
+	start,
+	stop,
+	secondsByTicketForDate,
+	currentWorkDate,
+	hasSessionStartedAfter
+} from '$lib/server/repo/sessions';
+import { isClosed, getClosingInfo } from '$lib/server/repo/closings';
 
 export interface TicketWithTime extends Ticket {
 	todaySeconds: number;
@@ -19,12 +25,21 @@ export const load: PageServerLoad = () => {
 
 	const dayTotalSeconds = [...secByTicket.values()].reduce((a, b) => a + b, 0);
 
+	const closingInfo = getClosingInfo(workDate);
+	const reclosingBanner =
+		closingInfo &&
+		(dayTotalSeconds > closingInfo.measuredTotalSeconds ||
+			hasSessionStartedAfter(workDate, closingInfo.closedAt))
+			? { extraSeconds: Math.max(dayTotalSeconds - closingInfo.measuredTotalSeconds, 0) }
+			: null;
+
 	return {
 		workDate,
 		tickets,
 		statuses: listStatuses(),
 		dayTotalSeconds,
-		closed: isClosed(workDate)
+		closed: isClosed(workDate),
+		reclosingBanner
 	};
 };
 
