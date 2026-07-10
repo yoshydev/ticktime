@@ -75,6 +75,10 @@
 				<input name="form_entry_jira_url" value={s.form_entry_jira_url ?? ''} />
 			</label>
 			<label>
+				プロジェクト
+				<input name="form_entry_project" value={s.form_entry_project ?? ''} />
+			</label>
+			<label>
 				進捗%
 				<input name="form_entry_progress" value={s.form_entry_progress ?? ''} />
 			</label>

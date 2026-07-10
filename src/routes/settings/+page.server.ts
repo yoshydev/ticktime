@@ -12,7 +12,7 @@ import {
 import { probeConnection, type JiraProbeResult } from '$lib/server/jira';
 import { isSafeHttpUrl } from '$lib/url';
 
-/** 一般設定フォームで編集可能な設定キー（entry ID は 6 項目）。 */
+/** 一般設定フォームで編集可能な設定キー（entry ID は 7 項目）。 */
 const GENERAL_KEYS = [
 	'user_name',
 	'project_name',
@@ -21,6 +21,7 @@ const GENERAL_KEYS = [
 	'form_entry_date',
 	'form_entry_title',
 	'form_entry_jira_url',
+	'form_entry_project',
 	'form_entry_progress',
 	'form_entry_hours',
 	'jira_browse_base'
