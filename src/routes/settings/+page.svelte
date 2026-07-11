@@ -240,7 +240,7 @@
 					<strong>{jiraProbe.configExists ? 'あり' : 'なし'}</strong>
 				</li>
 				<li>
-					認証情報（email/token）:
+					接続設定（site/email/token）:
 					<strong>{jiraProbe.available ? '揃っている' : '不足'}</strong>
 				</li>
 				{#if jiraProbe.available}

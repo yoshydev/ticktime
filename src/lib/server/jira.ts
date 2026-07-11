@@ -54,6 +54,16 @@ type Credentials =
 	| { available: true; configExists: boolean; site: string; authHeader: string };
 
 /**
+ * JIRA_SITE の値をホスト名に正規化する（`https://` プレフィックスや末尾 `/`、空白を許容）。
+ * 正規化後に空ならホスト名不明として空文字を返す（呼び出し側で未設定扱いにする）。
+ */
+function normalizeSite(raw: string | undefined): string {
+	const trimmed = (raw ?? '').trim();
+	if (trimmed === '') return '';
+	return trimmed.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+}
+
+/**
  * 認証情報を解決する。環境変数 > 設定ファイルの優先順。
  * site / email / token のいずれかが欠ければ `{ available: false }`（未設定扱い）。
  * 返り値の authHeader は Basic 認証ヘッダ。呼び出し側でログ・レスポンスに出さないこと。
@@ -61,7 +71,7 @@ type Credentials =
 function resolveCredentials(): Credentials {
 	const configExists = existsSync(CONFIG_PATH);
 	const conf = parseConfigFile();
-	const site = process.env.JIRA_SITE || conf.JIRA_SITE;
+	const site = normalizeSite(process.env.JIRA_SITE || conf.JIRA_SITE);
 	const email = process.env.JIRA_EMAIL || process.env.JIRA_USER_EMAIL || conf.JIRA_EMAIL;
 	const token = process.env.JIRA_API_TOKEN || conf.JIRA_API_TOKEN;
 	if (!site || !email || !token) return { available: false, configExists };
