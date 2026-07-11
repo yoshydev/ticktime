@@ -14,14 +14,14 @@
 ## 利用（npx）
 
 ```bash
-npx ticktime            # http://localhost:8425 で起動
-npx ticktime --open     # 起動後にブラウザを開く
-npx ticktime --port 9000
+npx @yoshydev/ticktime            # http://localhost:8425 で起動
+npx @yoshydev/ticktime --open     # 起動後にブラウザを開く
+npx @yoshydev/ticktime --port 9000
 ```
 
 ローカル利用のみを想定（リモートデプロイなし）。表示される URL（`http://localhost:<port>`）で
 アクセスすること。`http://127.0.0.1:<port>` で開くとフォーム送信（POST）が ORIGIN 検証で
-403 になる（127.0.0.1 で使いたい場合は `ORIGIN=http://127.0.0.1:8425 npx ticktime` のように
+403 になる（127.0.0.1 で使いたい場合は `ORIGIN=http://127.0.0.1:8425 npx @yoshydev/ticktime` のように
 ORIGIN を合わせて起動する）。
 
 ### フラグ・環境変数
@@ -70,14 +70,14 @@ npm run demo:fresh  # 空DB（初回起動と同じ状態）で http://localhost
 - サンプルデータは直近 3 営業日 + 当日の記録を含む。D-3 / D-2 は〆済み、D-1 は未〆で残してあり、
   未〆の過去日は `/close?date=YYYY-MM-DD` を開くと〆処理を試せる
 - デモ / CSV インポート等の開発スクリプトは TypeScript を Node で直接実行するため Node 24 前提
-  （配布パッケージ `npx ticktime` の動作要件 Node >=20 とは別）
+  （配布パッケージ `npx @yoshydev/ticktime` の動作要件 Node >=20 とは別）
 
 ## データベース
 
 - SQLite（WAL モード）。初回起動時にディレクトリと DB を自動生成し、`PRAGMA user_version` 方式でマイグレーションを適用する
 - **起動方法によって DB パスが異なる**:
   - `npm run dev`: `./data/ticktime.db`（gitignore 対象。`data/.gitkeep` のみコミット）
-  - `npx ticktime` / `npm run start`: プラットフォーム別データディレクトリ
+  - `npx @yoshydev/ticktime` / `npm run start`: プラットフォーム別データディレクトリ
     - Linux 等: `$XDG_DATA_HOME/ticktime/ticktime.db`（無ければ `~/.local/share/ticktime/ticktime.db`）
     - macOS: `~/Library/Application Support/ticktime/ticktime.db`
     - Windows: `%LOCALAPPDATA%\ticktime\ticktime.db`
