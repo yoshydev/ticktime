@@ -19,6 +19,15 @@
 		copyRows.splice(index, 1);
 	}
 
+	/** 設定フォーム用 enhance: 保存成功時のフォームリセットを無効化する。
+	 * デフォルトの reset は入力をDOM上のデフォルト値へ戻すため、保存で値が変わらなかった
+	 * 項目（例: 日付境界時刻）が見かけ上空になってしまう。 */
+	const noResetEnhance = () => {
+		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+			await update({ reset: false });
+		};
+	};
+
 	/** 指定セクションの成功メッセージを表示するか。 */
 	function okFor(section: string): boolean {
 		return !!form && 'ok' in form && form.ok === true && form.section === section;
@@ -52,7 +61,7 @@
 	{#if errorFor('general')}
 		<p class="error">{errorFor('general')}</p>
 	{/if}
-	<form method="POST" action="?/saveGeneral" use:enhance class="settings-form card">
+	<form method="POST" action="?/saveGeneral" use:enhance={noResetEnhance} class="settings-form card">
 		<label>
 			氏名
 			<input name="user_name" value={s.user_name ?? ''} />
@@ -122,7 +131,7 @@
 	{#if errorFor('copy')}
 		<p class="error">{errorFor('copy')}</p>
 	{/if}
-	<form method="POST" action="?/saveCopyTemplates" use:enhance class="settings-form card">
+	<form method="POST" action="?/saveCopyTemplates" use:enhance={noResetEnhance} class="settings-form card">
 		<p class="hint">
 			チケット一覧・今日ページのコピーボタンになります。利用可能な変数:
 			<code>{'{ticket_key}'}</code>
@@ -175,7 +184,7 @@
 				{#each data.statuses as st (st.id)}
 					<tr>
 						<td>
-							<form method="POST" action="?/updateStatus" use:enhance id={`upd-${st.id}`}>
+							<form method="POST" action="?/updateStatus" use:enhance={noResetEnhance} id={`upd-${st.id}`}>
 								<input type="hidden" name="id" value={st.id} />
 								<input name="name" value={st.name} />
 							</form>
