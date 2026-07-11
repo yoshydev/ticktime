@@ -11,29 +11,64 @@
 
 スタック: SvelteKit (Svelte 5 runes, TypeScript) + better-sqlite3。API サーバー分離なし、SvelteKit 単体で完結。
 
-## 起動
+## 利用（npx）
+
+```bash
+npx ticktime            # http://localhost:8425 で起動
+npx ticktime --open     # 起動後にブラウザを開く
+npx ticktime --port 9000
+```
+
+ローカル利用のみを想定（リモートデプロイなし）。表示される URL（`http://localhost:<port>`）で
+アクセスすること。`http://127.0.0.1:<port>` で開くとフォーム送信（POST）が ORIGIN 検証で
+403 になる（127.0.0.1 で使いたい場合は `ORIGIN=http://127.0.0.1:8425 npx ticktime` のように
+ORIGIN を合わせて起動する）。
+
+### フラグ・環境変数
+
+| フラグ | 環境変数 | デフォルト | 説明 |
+| --- | --- | --- | --- |
+| `--port <n>` | `PORT` | `8425` | リッスンポート（フラグが環境変数より優先） |
+| `--db <path>` | `TICKTIME_DB` | 下記参照 | SQLite DB ファイルのパス |
+| `--open` | — | off | 起動後にブラウザで開く |
+| — | `HOST` | `127.0.0.1` | バインドアドレス（外部非公開デフォルト） |
+| — | `ORIGIN` | `http://localhost:<port>` | POST の origin 検証に使うオリジン |
+| — | `BODY_SIZE_LIMIT` | adapter-node 既定 | リクエストボディ上限 |
+
+`--help` / `--version` も利用可。
+
+## 開発
 
 ```bash
 npm install
 npm run dev
 ```
 
-`http://localhost:5173/` を開く。ローカル利用のみを想定（リモートデプロイなし）。
+`http://localhost:5173/` を開く。
 
-## その他のコマンド
+### その他のコマンド
 
 ```bash
 npm run check   # svelte-check による型チェック
-npm run test    # vitest（workdate / duration などの純関数テスト）
-npm run build   # 本番ビルド（現状 adapter-auto）
+npm run test    # vitest（workdate / duration / bin の純関数テスト）
+npm run build   # 本番ビルド（adapter-node → build/）
+npm run start   # build/ を bin/ticktime.js 経由で起動（要 npm run build）
 ```
 
 ## データベース
 
-- 実体: `data/ticktime.db`（SQLite, WAL モード）。`data/` は gitignore 対象（`data/.gitkeep` のみコミット）
-- 初回起動時に `data/` ディレクトリと DB を自動生成し、`PRAGMA user_version` 方式でマイグレーションを適用する
+- SQLite（WAL モード）。初回起動時にディレクトリと DB を自動生成し、`PRAGMA user_version` 方式でマイグレーションを適用する
+- **起動方法によって DB パスが異なる**:
+  - `npm run dev`: `./data/ticktime.db`（gitignore 対象。`data/.gitkeep` のみコミット）
+  - `npx ticktime` / `npm run start`: プラットフォーム別データディレクトリ
+    - Linux 等: `$XDG_DATA_HOME/ticktime/ticktime.db`（無ければ `~/.local/share/ticktime/ticktime.db`）
+    - macOS: `~/Library/Application Support/ticktime/ticktime.db`
+    - Windows: `%LOCALAPPDATA%\ticktime\ticktime.db`
+  - いずれも `--db` / `TICKTIME_DB` で明示指定可能。`node build` 直起動は DB パス解決を通らないため正式サポート外（bin 経由が正）
 - 時刻は epoch ミリ秒、業務日付は JST 基準の `YYYY-MM-DD`。業務日付の境界時刻はデフォルト 05:00（設定で変更可）
-- 中身の確認: `sqlite3 data/ticktime.db`
+- 中身の確認: `sqlite3 <DBパス>`（開発時は `sqlite3 data/ticktime.db`。npx 利用時は上記プラットフォーム別パス。起動時のコンソールに実際のパスが表示される）
+- バックアップは `ticktime.db` 単体でなく WAL の 3 点セット（`.db` / `.db-wal` / `.db-shm`）をまとめて取ること
+- 別ポートで 2 プロセス起動すると同一 DB を共有する。WAL ロックとタイマー排他インデックスでデータは壊れないが UI は混乱し得るため、単一インスタンスでの利用を推奨
 
 ## better-sqlite3 のネイティブビルドについて
 
@@ -45,6 +80,10 @@ sudo apt-get install -y build-essential python3
 ```
 
 その後 `npm rebuild better-sqlite3` で再ビルドできる。
+
+npx での初回起動時は prebuild バイナリを取得するためビルド不要なことが多い。Node のメジャー
+バージョンを切り替えた後に `NODE_MODULE_VERSION` 不一致エラーが出る場合は、npx キャッシュ
+（`~/.npm/_npx`）を削除して再実行する。
 
 ## 開発環境
 

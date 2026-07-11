@@ -3,7 +3,9 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { migrations } from './migrations';
 
-const DB_PATH = resolve(process.cwd(), 'data', 'ticktime.db');
+// DBパス: 環境変数 TICKTIME_DB があれば優先（bin/ticktime.js が絶対パスをセットする）。
+// 無ければ従来どおり ./data/ticktime.db（npm run dev 時の挙動）。
+const DB_PATH = process.env.TICKTIME_DB || resolve(process.cwd(), 'data', 'ticktime.db');
 
 let _db: Database.Database | null = null;
 
