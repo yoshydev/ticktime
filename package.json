@@ -22,6 +22,8 @@
 	},
 	"scripts": {
 		"dev": "vite dev",
+		"demo": "node scripts/demo-seed.ts && TICKTIME_DB=data/demo.db vite dev --port 5174",
+		"demo:fresh": "node scripts/demo-seed.ts --fresh && TICKTIME_DB=data/demo.db vite dev --port 5174",
 		"build": "vite build",
 		"preview": "vite preview",
 		"start": "node bin/ticktime.js",

@@ -55,6 +55,23 @@ npm run build   # 本番ビルド（adapter-node → build/）
 npm run start   # build/ を bin/ticktime.js 経由で起動（要 npm run build）
 ```
 
+### デモ環境
+
+実データに一切触れずに動作確認できるデモモード。
+
+```bash
+npm run demo        # サンプルデータ入りで http://localhost:5174 で起動
+npm run demo:fresh  # 空DB（初回起動と同じ状態）で http://localhost:5174 で起動
+```
+
+- DB は `data/demo.db` を使用し、実データ（`data/ticktime.db`）とは完全に分離される
+- **起動のたびに demo.db を削除して作り直す**（デモ中に自分で操作した内容も次回起動で消える）
+- `npm run dev`（5173）と同時起動できる。ただし demo.db は共有されるため、demo は 1 プロセスのみで使うこと（strictPort により多重起動は即エラー）
+- サンプルデータは直近 3 営業日 + 当日の記録を含む。D-3 / D-2 は〆済み、D-1 は未〆で残してあり、
+  未〆の過去日は `/close?date=YYYY-MM-DD` を開くと〆処理を試せる
+- デモ / CSV インポート等の開発スクリプトは TypeScript を Node で直接実行するため Node 24 前提
+  （配布パッケージ `npx ticktime` の動作要件 Node >=20 とは別）
+
 ## データベース
 
 - SQLite（WAL モード）。初回起動時にディレクトリと DB を自動生成し、`PRAGMA user_version` 方式でマイグレーションを適用する

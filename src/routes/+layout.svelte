@@ -59,6 +59,36 @@
 	</div>
 </header>
 
+{#if data.setupNeeded && page.url.pathname !== '/settings'}
+	<div class="container banner-container">
+		<div class="setup-banner">
+			はじめての方へ: まずは<a href="/settings">設定画面</a
+			>で氏名や報告URLテンプレートを登録しましょう（〆処理時の報告リンク生成などに使われます）。
+		</div>
+	</div>
+{/if}
+
 <main class="container">
 	{@render children()}
 </main>
+
+<style>
+	/* 初回セットアップ誘導バナー（警告色ではなくアクセント系の淡い情報バナー） */
+	/* .container の下パディング(4rem)は本文用なので、バナー行では打ち消す */
+	.banner-container {
+		padding-bottom: 0;
+	}
+	.setup-banner {
+		color: var(--accent);
+		background: var(--accent-soft);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+		border-radius: var(--radius-m);
+		padding: 0.75rem 1rem;
+		margin-top: 1.25rem;
+	}
+	.setup-banner a {
+		color: var(--accent);
+		font-weight: 600;
+		text-decoration: underline;
+	}
+</style>

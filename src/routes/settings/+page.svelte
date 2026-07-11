@@ -57,10 +57,12 @@
 			氏名
 			<input name="user_name" value={s.user_name ?? ''} />
 		</label>
+		<p class="hint">報告URLテンプレートの <code>{'{user_name}'}</code> に入る値です。</p>
 		<label>
 			プロジェクト名
 			<input name="project_name" value={s.project_name ?? ''} />
 		</label>
+		<p class="hint">報告URLテンプレートの <code>{'{project_name}'}</code> に入る値です。</p>
 		<label class="wide">
 			報告URLテンプレート（〆確定時の報告リンクを生成）
 			<textarea name="report_url_template" rows="4">{s.report_url_template ?? ''}</textarea>
@@ -82,6 +84,9 @@
 			<br />
 			変数はURLエンコードされて埋め込まれます。スキーム・ホスト部はリテラル必須（変数は使えません）。
 			空にすると報告リンク機能を無効化します。
+			<br />
+			Googleフォームの場合: フォームの「⋮ → 事前入力したURLを取得」で生成したURLの
+			<code>entry.xxx=値</code> の値部分を <code>{'{変数}'}</code> に置き換えて貼り付けます。
 		</p>
 
 		<label class="wide">
@@ -98,6 +103,9 @@
 				max="23"
 			/>
 		</label>
+		<p class="hint">
+			この時刻より前の作業は前日の業務日付に計上されます（深夜作業を当日扱いにするための境界。変更しても過去の記録は再計算されません）。
+		</p>
 
 		<div>
 			<button type="submit" class="btn btn-primary">保存</button>
@@ -226,6 +234,10 @@
 <!-- ===== Jira 疎通確認 ===== -->
 <section>
 	<h2 class="group-title">Jira 疎通確認</h2>
+	<p class="hint">
+		Jira連携はチケット追加時のタイトル自動取得に使います。<code>~/.config/jira/config</code>
+		に site / email / APIトークンを記載してください（この画面からは設定できません）。
+	</p>
 	{#if errorFor('jira')}
 		<p class="error">{errorFor('jira')}</p>
 	{/if}

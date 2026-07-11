@@ -6,6 +6,8 @@ import { parseCopyTemplates } from '$lib/copyTemplates';
 export const load: LayoutServerLoad = () => {
 	return {
 		running: getRunning(),
-		copyTemplates: parseCopyTemplates(getSetting('copy_templates', '[]'))
+		copyTemplates: parseCopyTemplates(getSetting('copy_templates', '[]')),
+		// 初回セットアップ誘導バナーの表示条件（氏名を保存すると自動で消える）
+		setupNeeded: getSetting('user_name').trim() === ''
 	};
 };
