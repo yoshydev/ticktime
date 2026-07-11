@@ -1,10 +1,23 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { parseCopyTemplates, type CopyTemplate } from '$lib/copyTemplates';
 	import type { PageServerData, ActionData } from './$types';
 
 	let { data, form }: { data: PageServerData; form: ActionData } = $props();
 
 	const s = $derived(data.settings);
+
+	/** コピー用テンプレートの編集用ローカル配列（行の追加・削除をクライアント側で行う）。
+	 * 初期値のみ data から取り、以後はローカル編集する意図なので初期値キャプチャで正しい。 */
+	// svelte-ignore state_referenced_locally
+	let copyRows = $state<CopyTemplate[]>(parseCopyTemplates(data.settings.copy_templates ?? '[]'));
+
+	function addCopyRow() {
+		copyRows.push({ label: '', template: '' });
+	}
+	function removeCopyRow(index: number) {
+		copyRows.splice(index, 1);
+	}
 
 	/** 指定セクションの成功メッセージを表示するか。 */
 	function okFor(section: string): boolean {
@@ -49,44 +62,27 @@
 			<input name="project_name" value={s.project_name ?? ''} />
 		</label>
 		<label class="wide">
-			フォームベースURL（<code>.../viewform</code> まで。クエリは付けない）
-			<input name="form_base_url" value={s.form_base_url ?? ''} />
+			報告URLテンプレート（〆確定時の報告リンクを生成）
+			<textarea name="report_url_template" rows="4">{s.report_url_template ?? ''}</textarea>
 		</label>
-
 		<p class="hint">
-			Google フォームの各項目の entry ID。<strong>報告日</strong>は 1 つの ID を入れると
-			<code>_year</code> / <code>_month</code> / <code>_day</code> サフィックスは自動付与されます。
+			利用可能な変数:
+			<code>{'{user_name}'}</code>
+			<code>{'{project_name}'}</code>
+			<code>{'{date}'}</code>
+			<code>{'{date_year}'}</code>
+			<code>{'{date_month}'}</code>
+			<code>{'{date_day}'}</code>
+			<code>{'{ticket_key}'}</code>
+			<code>{'{title}'}</code>
+			<code>{'{jira_url}'}</code>
+			<code>{'{hours}'}</code>
+			<code>{'{progress}'}</code>
+			<code>{'{status}'}</code>
+			<br />
+			変数はURLエンコードされて埋め込まれます。スキーム・ホスト部はリテラル必須（変数は使えません）。
+			空にすると報告リンク機能を無効化します。
 		</p>
-		<div class="entry-grid">
-			<label>
-				氏名
-				<input name="form_entry_name" value={s.form_entry_name ?? ''} />
-			</label>
-			<label>
-				報告日
-				<input name="form_entry_date" value={s.form_entry_date ?? ''} />
-			</label>
-			<label>
-				タイトル
-				<input name="form_entry_title" value={s.form_entry_title ?? ''} />
-			</label>
-			<label>
-				Jira URL
-				<input name="form_entry_jira_url" value={s.form_entry_jira_url ?? ''} />
-			</label>
-			<label>
-				プロジェクト
-				<input name="form_entry_project" value={s.form_entry_project ?? ''} />
-			</label>
-			<label>
-				進捗%
-				<input name="form_entry_progress" value={s.form_entry_progress ?? ''} />
-			</label>
-			<label>
-				作業時間
-				<input name="form_entry_hours" value={s.form_entry_hours ?? ''} />
-			</label>
-		</div>
 
 		<label class="wide">
 			Jira ブラウズベースURL（チケット URL 未指定時に <code>ベース + キー</code> で導出）
@@ -104,6 +100,44 @@
 		</label>
 
 		<div>
+			<button type="submit" class="btn btn-primary">保存</button>
+		</div>
+	</form>
+</section>
+
+<!-- ===== コピー用テンプレート ===== -->
+<section>
+	<h2 class="group-title">コピー用テンプレート</h2>
+	{#if okFor('copy')}
+		<p class="ok">保存しました</p>
+	{/if}
+	{#if errorFor('copy')}
+		<p class="error">{errorFor('copy')}</p>
+	{/if}
+	<form method="POST" action="?/saveCopyTemplates" use:enhance class="settings-form card">
+		<p class="hint">
+			チケット一覧・今日ページのコピーボタンになります。利用可能な変数:
+			<code>{'{ticket_key}'}</code>
+			<code>{'{title}'}</code>
+		</p>
+		{#if copyRows.length === 0}
+			<p class="hint muted">テンプレートがありません（コピーボタンは表示されません）。</p>
+		{/if}
+		{#each copyRows as row, i (i)}
+			<div class="copy-row">
+				<label>
+					ラベル
+					<input name="label" bind:value={row.label} placeholder="ブランチ" />
+				</label>
+				<label class="grow">
+					テンプレート
+					<input name="template" bind:value={row.template} placeholder={'feature/{ticket_key}'} />
+				</label>
+				<button type="button" class="btn btn-danger" onclick={() => removeCopyRow(i)}>削除</button>
+			</div>
+		{/each}
+		<div class="copy-actions">
+			<button type="button" class="btn" onclick={addCopyRow}>行を追加</button>
 			<button type="submit" class="btn btn-primary">保存</button>
 		</div>
 	</form>
@@ -248,17 +282,41 @@
 	.settings-form .narrow input {
 		max-width: 8rem;
 	}
-	.entry-grid {
-		display: grid;
-		grid-template-columns: repeat(2, 1fr);
-		gap: 0.6rem;
+	/* textarea は app.css の input と同じトークンで揃える */
+	.settings-form textarea {
+		resize: vertical;
+		padding: 0.35rem 0.55rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-s);
+		font: inherit;
+		background: var(--surface-2);
+		color: var(--fg);
+		transition:
+			border-color 150ms ease,
+			box-shadow 150ms ease;
 	}
-	.entry-grid label {
+	.settings-form textarea:focus {
+		border-color: var(--accent);
+		box-shadow: 0 0 0 3px var(--accent-soft);
+	}
+	.copy-row {
+		display: flex;
+		gap: 0.6rem;
+		align-items: flex-end;
+	}
+	.copy-row label {
 		display: flex;
 		flex-direction: column;
 		font-size: 0.85rem;
 		gap: 0.25rem;
 		color: var(--muted);
+	}
+	.copy-row .grow {
+		flex: 1;
+	}
+	.copy-actions {
+		display: flex;
+		gap: 0.6rem;
 	}
 	.hint {
 		font-size: 0.8rem;

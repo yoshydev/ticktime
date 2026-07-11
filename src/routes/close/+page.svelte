@@ -18,6 +18,8 @@
 	}
 
 	const closed = $derived(form && 'closed' in form ? form.closed : null);
+	// 報告リンクが1件でもあれば報告セクションの見出しを出す（テンプレート未設定なら全件空）
+	const hasFormUrl = $derived(!!closed && closed.some((e) => e.formUrl));
 </script>
 
 <h1>〆処理</h1>
@@ -54,13 +56,19 @@
 		{#if closed.length === 0}
 			<p class="muted">確定時間が入った明細はありません。</p>
 		{:else}
-			<p>各チケットの報告フォーム（プレフィル済み）:</p>
+			{#if hasFormUrl}
+				<p>各チケットの報告フォーム（プレフィル済み）:</p>
+			{/if}
 			<ul class="form-links">
 				{#each closed as e (e.ticketId)}
 					<li>
-						<a href={e.formUrl} target="_blank" rel="noopener">
+						{#if e.formUrl}
+							<a href={e.formUrl} target="_blank" rel="noopener">
+								{e.ticketKey} — {e.title}（{formatHM(e.finalSeconds)} / 進捗{e.progress}%）
+							</a>
+						{:else}
 							{e.ticketKey} — {e.title}（{formatHM(e.finalSeconds)} / 進捗{e.progress}%）
-						</a>
+						{/if}
 					</li>
 				{/each}
 			</ul>

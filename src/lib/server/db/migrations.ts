@@ -89,5 +89,69 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 UPDATE settings
 SET value = 'https://example.atlassian.net/browse/'
 WHERE key = 'jira_browse_base' AND value = '';
+`,
+	// --- migration 3: フォームURL設定をテンプレート方式に移行 + コピーテンプレートのシード ---
+	// 旧 form_base_url / form_entry_* から report_url_template を合成して旧キーを削除する（不可逆）。
+	// - 旧キーの読み出しは COALESCE で防御（キー欠損時の NULL 伝播で value NOT NULL に抵触するのを防ぐ）
+	// - パラメータ順は旧 buildFormUrl の params.set 順を厳守:
+	//   usp=pp_url → name → date_year/_month/_day → title → jira_url → project → progress → hours
+	// - form_base_url が空ならテンプレートは ''（機能無効化）。entry ID が空の項目は省略に正規化（意図的な非互換）
+	// - entry ID は英数と . _ のみを有効とし、それ以外（& = # % { } 等を含む値）は空扱いで省略する
+	//   （テンプレートへの区切り文字・変数の注入を防ぐ。旧設定画面は entry ID を検証していなかったため）
+	`
+INSERT OR IGNORE INTO settings (key, value)
+SELECT
+  'report_url_template',
+  CASE WHEN base = '' THEN '' ELSE
+    base || '?usp=pp_url'
+    || CASE WHEN e_name     = '' THEN '' ELSE '&' || e_name || '={user_name}' END
+    || CASE WHEN e_date     = '' THEN '' ELSE
+         '&' || e_date || '_year={date_year}'
+         || '&' || e_date || '_month={date_month}'
+         || '&' || e_date || '_day={date_day}'
+       END
+    || CASE WHEN e_title    = '' THEN '' ELSE '&' || e_title    || '={title}' END
+    || CASE WHEN e_jira     = '' THEN '' ELSE '&' || e_jira     || '={jira_url}' END
+    || CASE WHEN e_project  = '' THEN '' ELSE '&' || e_project  || '={project_name}' END
+    || CASE WHEN e_progress = '' THEN '' ELSE '&' || e_progress || '={progress}' END
+    || CASE WHEN e_hours    = '' THEN '' ELSE '&' || e_hours    || '={hours}' END
+  END
+FROM (
+  SELECT
+    base,
+    CASE WHEN e_name     GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_name     END AS e_name,
+    CASE WHEN e_date     GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_date     END AS e_date,
+    CASE WHEN e_title    GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_title    END AS e_title,
+    CASE WHEN e_jira     GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_jira     END AS e_jira,
+    CASE WHEN e_project  GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_project  END AS e_project,
+    CASE WHEN e_progress GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_progress END AS e_progress,
+    CASE WHEN e_hours    GLOB '*[^A-Za-z0-9._]*' THEN '' ELSE e_hours    END AS e_hours
+  FROM (
+    SELECT
+      COALESCE((SELECT value FROM settings WHERE key = 'form_base_url'),       '') AS base,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_name'),     '') AS e_name,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_date'),     '') AS e_date,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_title'),    '') AS e_title,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_jira_url'), '') AS e_jira,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_project'),  '') AS e_project,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_progress'), '') AS e_progress,
+      COALESCE((SELECT value FROM settings WHERE key = 'form_entry_hours'),    '') AS e_hours
+  )
+);
+
+DELETE FROM settings WHERE key IN (
+  'form_base_url',
+  'form_entry_name',
+  'form_entry_date',
+  'form_entry_title',
+  'form_entry_jira_url',
+  'form_entry_project',
+  'form_entry_progress',
+  'form_entry_hours'
+);
+
+-- コピー用テンプレートのシード（従来のブランチ名/PRタイトル/テスト仕様書名ボタンを維持）
+INSERT OR IGNORE INTO settings (key, value) VALUES
+  ('copy_templates', '[{"label":"ブランチ","template":"feature/{ticket_key}"},{"label":"PRタイトル","template":"[WIP][{ticket_key}]{title}"},{"label":"テスト仕様書","template":"{ticket_key}_{title}"}]');
 `
 ];

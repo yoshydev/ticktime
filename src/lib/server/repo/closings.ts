@@ -1,6 +1,6 @@
 import { getDb } from '$lib/server/db';
 import { getAllSettings } from './settings';
-import { buildFormUrl, type FormUrlSettings } from '$lib/server/formUrl';
+import { buildReportUrl } from '$lib/server/reportUrl';
 
 /** 〆ドラフトの1行（チケット別）。 */
 export interface ClosingDraftRow {
@@ -202,21 +202,6 @@ export function getClosingDraft(workDate: string): ClosingDraft {
 	};
 }
 
-function formUrlSettings(s: Record<string, string>): FormUrlSettings {
-	return {
-		baseUrl: s.form_base_url ?? '',
-		entryName: s.form_entry_name ?? '',
-		entryDate: s.form_entry_date ?? '',
-		entryTitle: s.form_entry_title ?? '',
-		entryJiraUrl: s.form_entry_jira_url ?? '',
-		entryProject: s.form_entry_project ?? '',
-		entryProgress: s.form_entry_progress ?? '',
-		entryHours: s.form_entry_hours ?? '',
-		userName: s.user_name ?? '',
-		projectName: s.project_name ?? ''
-	};
-}
-
 /**
  * 対象業務日付の〆を確定する（1トランザクション）。
  * - 冒頭で対象日の走行中セッションを再チェックし、あれば abort（エラー送出）
@@ -232,7 +217,10 @@ function formUrlSettings(s: Record<string, string>): FormUrlSettings {
  */
 export function confirmClosing(workDate: string, inputs: ClosingEntryInput[]): ClosedEntry[] {
 	const db = getDb();
-	const fus = formUrlSettings(getAllSettings());
+	const settings = getAllSettings();
+	const reportTemplate = (settings.report_url_template ?? '').trim();
+	const userName = settings.user_name ?? '';
+	const projectName = settings.project_name ?? '';
 
 	const tx = db.transaction((): ClosedEntry[] => {
 		// 走行中の再チェック（別タブ・二重送信対策）
@@ -332,13 +320,21 @@ export function confirmClosing(workDate: string, inputs: ClosingEntryInput[]): C
 			if (finalSeconds <= 0) continue;
 
 			const jiraUrl = base.jira_url ?? '';
-			const formUrl = buildFormUrl(fus, {
-				workDate,
-				title: base.title,
-				jiraUrl,
-				progress,
-				finalSeconds
-			});
+			// テンプレートが空なら報告リンク機能は無効（form_url は空文字で保存）
+			const formUrl =
+				reportTemplate === ''
+					? ''
+					: buildReportUrl(reportTemplate, {
+							userName,
+							projectName,
+							workDate,
+							ticketKey: base.key,
+							title: base.title,
+							jiraUrl,
+							progress,
+							finalSeconds,
+							statusName: status.name
+						});
 
 			insertEntry.run(
 				closingId,

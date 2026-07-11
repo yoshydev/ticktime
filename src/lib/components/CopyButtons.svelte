@@ -1,17 +1,27 @@
 <script lang="ts">
-	let { ticketKey, title }: { ticketKey: string; title: string } = $props();
+	import type { CopyTemplate } from '$lib/copyTemplates';
+	import { renderTemplate } from '$lib/template';
+
+	let {
+		ticketKey,
+		title,
+		templates
+	}: { ticketKey: string; title: string; templates: CopyTemplate[] } = $props();
 
 	/** どのボタンをコピーしたか（フィードバック表示用）。 */
-	let copied = $state<string | null>(null);
+	let copied = $state<number | null>(null);
 	let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-	const items = $derived([
-		{ id: 'branch', label: 'ブランチ', value: `feature/${ticketKey}` },
-		{ id: 'pr', label: 'PRタイトル', value: `[WIP][${ticketKey}]${title}` },
-		{ id: 'test', label: 'テスト仕様書', value: `${ticketKey}_${title}` }
-	]);
+	// ユーザー定義テンプレートからコピー内容を生成する（URLエンコードなし）
+	const items = $derived(
+		templates.map((t, i) => ({
+			id: i,
+			label: t.label,
+			value: renderTemplate(t.template, { ticket_key: ticketKey, title })
+		}))
+	);
 
-	async function copy(id: string, value: string) {
+	async function copy(id: number, value: string) {
 		try {
 			await navigator.clipboard.writeText(value);
 			copied = id;
@@ -25,19 +35,21 @@
 	}
 </script>
 
-<span class="copy-buttons">
-	{#each items as item (item.id)}
-		<button
-			type="button"
-			class="copy-btn"
-			class:copied={copied === item.id}
-			title={item.value}
-			onclick={() => copy(item.id, item.value)}
-		>
-			{copied === item.id ? '✓ コピー' : item.label}
-		</button>
-	{/each}
-</span>
+{#if items.length > 0}
+	<span class="copy-buttons">
+		{#each items as item (item.id)}
+			<button
+				type="button"
+				class="copy-btn"
+				class:copied={copied === item.id}
+				title={item.value}
+				onclick={() => copy(item.id, item.value)}
+			>
+				{copied === item.id ? '✓ コピー' : item.label}
+			</button>
+		{/each}
+	</span>
+{/if}
 
 <style>
 	.copy-buttons {

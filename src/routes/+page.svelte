@@ -4,9 +4,9 @@
 	import { formatHMS, formatHM } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
 	import { statusColor } from '$lib/statusColor';
-	import type { PageServerData, ActionData } from './$types';
+	import type { PageData, ActionData } from './$types';
 
-	let { data, form }: { data: PageServerData; form: ActionData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 
 	const running = $derived(
 		page.data.running as { ticketId: number; ticketKey: string } | null
@@ -130,7 +130,7 @@
 							</td>
 							<td class="title-cell">
 								<div>{t.title}</div>
-								<CopyButtons ticketKey={t.key} title={t.title} />
+								<CopyButtons ticketKey={t.key} title={t.title} templates={data.copyTemplates} />
 							</td>
 							<td>
 								<form method="POST" action="?/setStatus" use:enhance class="status-form">

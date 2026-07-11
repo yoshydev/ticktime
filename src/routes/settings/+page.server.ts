@@ -11,21 +11,15 @@ import {
 } from '$lib/server/repo/settings';
 import { probeConnection, type JiraProbeResult } from '$lib/server/jira';
 import { isSafeHttpUrl } from '$lib/url';
+import { findInvalidPlaceholders } from '$lib/template';
+import { REPORT_URL_VARS } from '$lib/server/reportUrl';
+import { COPY_TEMPLATE_VARS } from '$lib/copyTemplates';
 
-/** 一般設定フォームで編集可能な設定キー（entry ID は 7 項目）。 */
-const GENERAL_KEYS = [
-	'user_name',
-	'project_name',
-	'form_base_url',
-	'form_entry_name',
-	'form_entry_date',
-	'form_entry_title',
-	'form_entry_jira_url',
-	'form_entry_project',
-	'form_entry_progress',
-	'form_entry_hours',
-	'jira_browse_base'
-] as const;
+/** 一般設定フォームで編集可能な設定キー。 */
+const GENERAL_KEYS = ['user_name', 'project_name', 'report_url_template', 'jira_browse_base'] as const;
+
+/** コピー用テンプレートの登録上限件数。 */
+const COPY_TEMPLATE_LIMIT = 20;
 
 const VALID_KINDS: Status['kind'][] = ['active', 'pending', 'done'];
 
@@ -55,14 +49,32 @@ export const actions: Actions = {
 		}
 		values.day_boundary_hour = String(boundary);
 
-		if (values.form_base_url === '') {
-			return fail(400, { section: 'general', message: 'フォームベースURLは必須です' });
-		}
-		if (!isSafeHttpUrl(values.form_base_url)) {
-			return fail(400, {
-				section: 'general',
-				message: 'フォームベースURLは http/https のURLを入力してください'
-			});
+		// 報告URLテンプレートは空を許可（空 = 報告リンク機能の無効化）
+		if (values.report_url_template !== '') {
+			if (!isSafeHttpUrl(values.report_url_template)) {
+				return fail(400, {
+					section: 'general',
+					message: '報告URLテンプレートは http/https のURLを入力してください'
+				});
+			}
+			// スキーム・ホスト・認証情報部の変数は拒否（リテラル必須）。
+			// URL パーサは username/password の `{` を `%7B` に正規化するため、エンコード済み表現も検査する
+			const url = new URL(values.report_url_template);
+			const hasBrace = (part: string) => part.includes('{') || part.toLowerCase().includes('%7b');
+			if (hasBrace(url.hostname) || hasBrace(url.username) || hasBrace(url.password)) {
+				return fail(400, {
+					section: 'general',
+					message:
+						'報告URLテンプレートのホスト部・認証情報部に変数は使えません（スキーム・ホストはリテラル必須）'
+				});
+			}
+			const invalid = findInvalidPlaceholders(values.report_url_template, REPORT_URL_VARS);
+			if (invalid.length > 0) {
+				return fail(400, {
+					section: 'general',
+					message: `未知の変数 ${invalid.join(' ')} が含まれています`
+				});
+			}
 		}
 		if (values.jira_browse_base !== '' && !isSafeHttpUrl(values.jira_browse_base)) {
 			return fail(400, {
@@ -73,6 +85,42 @@ export const actions: Actions = {
 
 		updateSettings(values);
 		return { section: 'general', ok: true };
+	},
+
+	saveCopyTemplates: async ({ request }) => {
+		const form = await request.formData();
+		const labels = form.getAll('label').map((v) => String(v).trim());
+		const templates = form.getAll('template').map((v) => String(v).trim());
+
+		if (labels.length !== templates.length) {
+			return fail(400, { section: 'copy', message: 'ラベルとテンプレートの件数が一致しません' });
+		}
+		if (labels.length > COPY_TEMPLATE_LIMIT) {
+			return fail(400, {
+				section: 'copy',
+				message: `コピー用テンプレートは最大 ${COPY_TEMPLATE_LIMIT} 件までです`
+			});
+		}
+		for (let i = 0; i < labels.length; i++) {
+			if (labels[i] === '' || templates[i] === '') {
+				return fail(400, {
+					section: 'copy',
+					message: `${i + 1} 行目: ラベルとテンプレートの両方を入力してください`
+				});
+			}
+			const invalid = findInvalidPlaceholders(templates[i], COPY_TEMPLATE_VARS);
+			if (invalid.length > 0) {
+				return fail(400, {
+					section: 'copy',
+					message: `${i + 1} 行目: 未知の変数 ${invalid.join(' ')} が含まれています`
+				});
+			}
+		}
+
+		// 0行は '[]' 保存で正当（ボタン非表示）
+		const json = JSON.stringify(labels.map((label, i) => ({ label, template: templates[i] })));
+		updateSettings({ copy_templates: json });
+		return { section: 'copy', ok: true };
 	},
 
 	addStatus: async ({ request }) => {

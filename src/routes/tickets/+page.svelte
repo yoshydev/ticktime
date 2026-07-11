@@ -2,9 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { formatHMS } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
-	import type { PageServerData, ActionData } from './$types';
+	import type { PageData, ActionData } from './$types';
 
-	let { data, form }: { data: PageServerData; form: ActionData } = $props();
+	let { data, form }: { data: PageData; form: ActionData } = $props();
 </script>
 
 <h1>チケット管理</h1>
@@ -42,7 +42,7 @@
 						</td>
 						<td class="title-cell">
 							<input class="text-input" form={formId} name="title" value={t.title} />
-							<CopyButtons ticketKey={t.key} title={t.title} />
+							<CopyButtons ticketKey={t.key} title={t.title} templates={data.copyTemplates} />
 						</td>
 						<td>
 							<input
