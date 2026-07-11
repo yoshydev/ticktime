@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { fetchIssueTitle, JiraError } from '$lib/server/jira';
 
-/** Jira チケットキーの許容形式（例: TICKET-6745）。 */
+/** Jira チケットキーの許容形式（例: TICKET-123）。 */
 const KEY_RE = /^[A-Z][A-Z0-9]+-\d+$/;
 
 /**

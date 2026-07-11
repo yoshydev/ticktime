@@ -26,28 +26,33 @@ function getSetting(db: Database.Database, key: string): string | undefined {
 }
 
 /**
- * migration 1 でシードされる旧 form_* 値（等価性検証の期待値構築に使う）。
- * 実運用の値をテストに書き写さないよう、migration 3 適用前のDBから動的に読む。
+ * 移行元となる旧 form_* 設定の汎用ダミー値（等価性検証の期待値構築に使う）。
+ * migration 1 のシードは空文字のため、テストでは createMigratedDb の hook で
+ * この値を settings に注入してから migration 3 を適用する。
  */
-function readLegacySeed() {
-	const db = new Database(':memory:');
-	for (const sql of migrations.slice(0, -1)) db.exec(sql);
-	const get = (key: string) => getSetting(db, key) ?? '';
-	const seed = {
-		baseUrl: get('form_base_url'),
-		entryName: get('form_entry_name'),
-		entryDate: get('form_entry_date'),
-		entryTitle: get('form_entry_title'),
-		entryJiraUrl: get('form_entry_jira_url'),
-		entryProject: get('form_entry_project'),
-		entryProgress: get('form_entry_progress'),
-		entryHours: get('form_entry_hours')
-	};
-	db.close();
-	return seed;
-}
+const seed = {
+	baseUrl: 'https://docs.google.com/forms/d/e/FORMID/viewform',
+	entryName: 'entry.101',
+	entryDate: 'entry.202',
+	entryTitle: 'entry.303',
+	entryJiraUrl: 'entry.404',
+	entryProject: 'entry.505',
+	entryProgress: 'entry.606',
+	entryHours: 'entry.707'
+};
 
-const seed = readLegacySeed();
+/** hook 用: 旧 form_* キーをダミー値で UPSERT する（migration 3 適用直前に実行される）。 */
+function injectLegacySeed(db: Database.Database): void {
+	const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+	upsert.run('form_base_url', seed.baseUrl);
+	upsert.run('form_entry_name', seed.entryName);
+	upsert.run('form_entry_date', seed.entryDate);
+	upsert.run('form_entry_title', seed.entryTitle);
+	upsert.run('form_entry_jira_url', seed.entryJiraUrl);
+	upsert.run('form_entry_project', seed.entryProject);
+	upsert.run('form_entry_progress', seed.entryProgress);
+	upsert.run('form_entry_hours', seed.entryHours);
+}
 
 const ctx: ReportUrlContext = {
 	userName: '山田 太郎',
@@ -83,7 +88,7 @@ function buildLegacyExpectedUrl(c: ReportUrlContext): string {
 
 describe('migration 3', () => {
 	it('生成された report_url_template が旧 buildFormUrl と意味的に等価なURLを生成する（デコード後パラメータのキー順込み一致。空白の + / %20 などバイト列の一致は保証しない）', () => {
-		const db = createMigratedDb();
+		const db = createMigratedDb(injectLegacySeed);
 		const template = getSetting(db, 'report_url_template');
 		expect(template).toBeDefined();
 
@@ -102,7 +107,7 @@ describe('migration 3', () => {
 	});
 
 	it('旧 form_* キー8個が削除されている', () => {
-		const db = createMigratedDb();
+		const db = createMigratedDb(injectLegacySeed);
 		const oldKeys = [
 			'form_base_url',
 			'form_entry_name',
@@ -130,8 +135,14 @@ describe('migration 3', () => {
 		]);
 	});
 
+	it('何も注入しない新規DB（シード空）では report_url_template が空文字になる（設定するまで報告リンク無効）', () => {
+		const db = createMigratedDb();
+		expect(getSetting(db, 'report_url_template')).toBe('');
+	});
+
 	it('form_base_url が空のDBでは report_url_template が空文字になる', () => {
 		const db = createMigratedDb((d) => {
+			injectLegacySeed(d);
 			d.prepare("UPDATE settings SET value = '' WHERE key = 'form_base_url'").run();
 		});
 		expect(getSetting(db, 'report_url_template')).toBe('');
@@ -139,6 +150,7 @@ describe('migration 3', () => {
 
 	it('entry ID が空の項目はテンプレートから省略される（旧実装の壊れたパラメータ出力を正規化する意図的な非互換）', () => {
 		const db = createMigratedDb((d) => {
+			injectLegacySeed(d);
 			d.prepare("UPDATE settings SET value = '' WHERE key = 'form_entry_jira_url'").run();
 			d.prepare("UPDATE settings SET value = '' WHERE key = 'form_entry_date'").run();
 		});
@@ -168,6 +180,7 @@ describe('migration 3', () => {
 
 	it('英数と . _ 以外を含む entry ID は空扱いで省略される（テンプレートへの区切り文字・変数の注入を防ぐ）', () => {
 		const db = createMigratedDb((d) => {
+			injectLegacySeed(d);
 			d.prepare(
 				"UPDATE settings SET value = 'entry.1&evil=1' WHERE key = 'form_entry_name'"
 			).run();

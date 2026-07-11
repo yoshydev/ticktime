@@ -69,10 +69,10 @@ INSERT OR IGNORE INTO statuses (name, kind, sort_order) VALUES
   ('起票者質問中','pending', 30),
   ('完了',       'done',    40);
 
--- 設定のシード（個人情報は空文字。設定画面で入力する）
+-- 設定のシード（個人・環境固有の値はすべて空文字。設定画面で入力する）
 INSERT OR IGNORE INTO settings (key, value) VALUES
   ('user_name',            ''),
-  ('project_name',         'サンプル案件'),
+  ('project_name',         ''),
   ('form_base_url',        ''),
   ('form_entry_name',      ''),
   ('form_entry_date',      ''),
@@ -84,11 +84,11 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('jira_browse_base',     ''),
   ('day_boundary_hour',    '5');
 `,
-	// --- migration 2: jira_browse_base の既定値埋め（空のままの既存DB向け） ---
+	// --- migration 2: （欠番・no-op） ---
+	// かつて jira_browse_base に環境固有の既定値を埋めていたが、配布準備で除去した。
+	// 要素数 = user_version の対応を維持するため、配列要素は削除せず無害な no-op にしている。
 	`
-UPDATE settings
-SET value = 'https://example.atlassian.net/browse/'
-WHERE key = 'jira_browse_base' AND value = '';
+UPDATE settings SET value = value WHERE 0;
 `,
 	// --- migration 3: フォームURL設定をテンプレート方式に移行 + コピーテンプレートのシード ---
 	// 旧 form_base_url / form_entry_* から report_url_template を合成して旧キーを削除する（不可逆）。

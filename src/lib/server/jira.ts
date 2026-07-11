@@ -2,7 +2,6 @@
  * Jira 連携（サーバーサイド専用）。
  *
  * `~/.config/jira/config`（KEY=VALUE 形式）を実行時に読み、チケットのタイトルを取得する。
- * 移植元: (移植元スクリプト) の load_config() / resolve_base()。
  *
  * セキュリティ最重要:
  *   - メールアドレス・API トークンを、クライアントへのレスポンス・例外メッセージ・
@@ -14,7 +13,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 const CONFIG_PATH = join(homedir(), '.config', 'jira', 'config');
-const DEFAULT_SITE = 'example.atlassian.net';
 
 export type JiraErrorCode = 'not_configured' | 'fetch_failed';
 
@@ -57,16 +55,16 @@ type Credentials =
 
 /**
  * 認証情報を解決する。環境変数 > 設定ファイルの優先順。
- * email / token のいずれかが欠ければ `{ available: false }`。
+ * site / email / token のいずれかが欠ければ `{ available: false }`（未設定扱い）。
  * 返り値の authHeader は Basic 認証ヘッダ。呼び出し側でログ・レスポンスに出さないこと。
  */
 function resolveCredentials(): Credentials {
 	const configExists = existsSync(CONFIG_PATH);
 	const conf = parseConfigFile();
-	const site = process.env.JIRA_SITE || conf.JIRA_SITE || DEFAULT_SITE;
+	const site = process.env.JIRA_SITE || conf.JIRA_SITE;
 	const email = process.env.JIRA_EMAIL || process.env.JIRA_USER_EMAIL || conf.JIRA_EMAIL;
 	const token = process.env.JIRA_API_TOKEN || conf.JIRA_API_TOKEN;
-	if (!email || !token) return { available: false, configExists };
+	if (!site || !email || !token) return { available: false, configExists };
 	const authHeader = 'Basic ' + Buffer.from(`${email}:${token}`).toString('base64');
 	return { available: true, configExists, site, authHeader };
 }
@@ -103,7 +101,7 @@ async function resolveBase(site: string, authHeader: string): Promise<string> {
 
 /**
  * チケットキーから summary（タイトル）を取得する。
- * 設定なし（email/token 欠落）は JiraError('not_configured')、
+ * 設定なし（site/email/token 欠落）は JiraError('not_configured')、
  * 取得失敗は JiraError('fetch_failed', status) を投げる。
  */
 export async function fetchIssueTitle(key: string): Promise<string> {
@@ -144,7 +142,7 @@ export async function fetchIssueTitle(key: string): Promise<string> {
 export interface JiraProbeResult {
 	/** `~/.config/jira/config` が存在するか。 */
 	configExists: boolean;
-	/** email/token が揃っているか。 */
+	/** site/email/token が揃っているか。 */
 	available: boolean;
 	/** myself プローブ結果。available=false のときは null。status は network 失敗時 null。 */
 	probe: { ok: boolean; status: number | null } | null;

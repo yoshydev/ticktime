@@ -36,7 +36,7 @@
 			} else if (body.error === 'not_configured') {
 				jiraMsg = 'Jira 設定がありません。タイトルは手入力してください。';
 			} else if (body.error === 'invalid_key') {
-				jiraMsg = 'チケット番号の形式が不正です（例: TICKET-1234）';
+				jiraMsg = 'チケット番号の形式が不正です（例: TICKET-123）';
 			} else {
 				jiraMsg = 'タイトルの取得に失敗しました。手入力してください。';
 			}
@@ -189,7 +189,7 @@
 >
 	<label>
 		チケット番号
-		<input name="key" placeholder="TICKET-1234" required bind:value={keyInput} />
+		<input name="key" placeholder="TICKET-123" required bind:value={keyInput} />
 	</label>
 	<button
 		type="button"
