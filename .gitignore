@@ -25,3 +25,6 @@ vite.config.ts.timestamp-*
 # Local database
 /data/*
 !/data/.gitkeep
+
+# セッション引き継ぎドキュメント（ローカル専用）
+HANDOVER.md
