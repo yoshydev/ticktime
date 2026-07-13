@@ -1,6 +1,6 @@
 {
 	"name": "@yoshydev/ticktime",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "チケット別の作業時間を管理するローカルツール（タイマー計測・日次〆処理・報告フォームURL生成）",
 	"license": "MIT",
 	"repository": {
