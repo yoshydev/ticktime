@@ -112,12 +112,13 @@ try {
 	throw err;
 }
 
+// import 完了と listen 完了の間にはわずかな差があるため、接続可能になるのを待ってから案内を出す
+// （adapter-node の `Listening on ...` より後に正しい案内URLが表示されるようにする）
+await waitForListen(port, host, 2000);
 console.log(`ticktime running at ${displayUrl}`);
 console.log(`database: ${dbPath}`);
 
 if (values.open) {
-	// import 完了と listen 完了の間にはわずかな差があるため、接続可能になるのを待ってから開く
-	await waitForListen(port, host, 2000);
 	// プラットフォーム別にブラウザを開く（失敗してもサーバーは起動済みなので無視）
 	const [cmd, args] =
 		process.platform === 'win32'

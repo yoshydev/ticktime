@@ -3,6 +3,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { enhance } from '$app/forms';
+	import { withErrorAlert } from '$lib/enhanceWithAlert';
 	import { page } from '$app/state';
 	import Timer from '$lib/components/Timer.svelte';
 	import type { Snippet } from 'svelte';
@@ -49,7 +50,7 @@
 				<span class="live-dot"></span>
 				<span class="key">{running.ticketKey}</span>
 				<Timer startedAt={running.startedAt} />
-				<form method="POST" action="/?/stop" use:enhance>
+				<form method="POST" action="/?/stop" use:enhance={withErrorAlert()}>
 					<button type="submit" class="btn btn-danger">停止</button>
 				</form>
 			</div>

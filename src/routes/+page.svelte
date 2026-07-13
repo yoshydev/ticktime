@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import { withErrorAlert } from '$lib/enhanceWithAlert';
 	import { formatHMS, formatHM } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
 	import { statusColor } from '$lib/statusColor';
@@ -133,7 +134,7 @@
 								<CopyButtons ticketKey={t.key} title={t.title} templates={data.copyTemplates} />
 							</td>
 							<td>
-								<form method="POST" action="?/setStatus" use:enhance class="status-form">
+								<form method="POST" action="?/setStatus" use:enhance={withErrorAlert()} class="status-form">
 									<input type="hidden" name="ticketId" value={t.id} />
 									<span class="status-dot" style="background: {statusColor(t.statusId)}"></span>
 									<select
@@ -158,7 +159,7 @@
 								{#if running?.ticketId === t.id}
 									<span class="running-tag"><span class="live-dot"></span>計測中</span>
 								{:else}
-									<form method="POST" action="?/start" use:enhance>
+									<form method="POST" action="?/start" use:enhance={withErrorAlert()}>
 										<input type="hidden" name="ticketId" value={t.id} />
 										<button type="submit" class="btn btn-primary">▶ 開始</button>
 									</form>
@@ -176,7 +177,7 @@
 	class="add-form"
 	method="POST"
 	action="?/addTicket"
-	use:enhance={() => {
+	use:enhance={withErrorAlert(() => {
 		return async ({ result, update }) => {
 			await update();
 			if (result.type === 'success') {
@@ -185,7 +186,7 @@
 				jiraMsg = null;
 			}
 		};
-	}}
+	})}
 >
 	<label>
 		チケット番号

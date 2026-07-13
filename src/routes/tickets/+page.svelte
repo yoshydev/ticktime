@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withErrorAlert } from '$lib/enhanceWithAlert';
 	import { formatHMS } from '$lib/duration';
 	import CopyButtons from '$lib/components/CopyButtons.svelte';
 	import type { PageData, ActionData } from './$types';
@@ -35,7 +36,7 @@
 					{@const formId = `update-${t.id}`}
 					<tr>
 						<td>
-							<form id={formId} method="POST" action="?/update" use:enhance>
+							<form id={formId} method="POST" action="?/update" use:enhance={withErrorAlert()}>
 								<input type="hidden" name="id" value={t.id} />
 							</form>
 							<input class="text-input" form={formId} name="key" value={t.key} />
@@ -81,9 +82,9 @@
 								<form
 									method="POST"
 									action="?/delete"
-									use:enhance={({ cancel }) => {
+									use:enhance={withErrorAlert(({ cancel }) => {
 										if (!confirm('本当に削除しますか？')) cancel();
-									}}
+									})}
 								>
 									<input type="hidden" name="id" value={t.id} />
 									<button type="submit" class="btn btn-danger">削除</button>

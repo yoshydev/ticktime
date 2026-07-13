@@ -18,7 +18,13 @@ export default defineConfig({
 
 			// adapter-node: `npm run build` で build/ に自己完結なNodeサーバーを生成する
 			// （npx配布用。localhost配信のみなので事前圧縮は不要）
-			adapter: adapter({ out: 'build', precompress: false })
+			adapter: adapter({ out: 'build', precompress: false }),
+
+			// kit標準CSRFチェックは handle フックより前に走り、ORIGIN 環境変数（単一値）と
+			// しか比較できない。npx配布版は localhost / 127.0.0.1 / [::1] のどれでアクセス
+			// されるか実行時まで分からないため無効化し、hooks.server.ts の
+			// Origin ↔ Host 検証に一本化する
+			csrf: { trustedOrigins: ['*'] }
 		})
 	]
 });

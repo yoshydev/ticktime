@@ -19,10 +19,9 @@ npx @yoshydev/ticktime --open     # 起動後にブラウザを開く
 npx @yoshydev/ticktime --port 9000
 ```
 
-ローカル利用のみを想定（リモートデプロイなし）。表示される URL（`http://localhost:<port>`）で
-アクセスすること。`http://127.0.0.1:<port>` で開くとフォーム送信（POST）が ORIGIN 検証で
-403 になる（127.0.0.1 で使いたい場合は `ORIGIN=http://127.0.0.1:8425 npx @yoshydev/ticktime` のように
-ORIGIN を合わせて起動する）。
+ローカル利用のみを想定（リモートデプロイなし）。`http://localhost:<port>` / `http://127.0.0.1:<port>` /
+`http://[::1]:<port>` のいずれでもアクセス可能。フォーム送信はループバックホストからの
+同一オリジンのみ受け付ける（外部サイトからのクロスサイトPOSTやループバック以外のホスト名は403で拒否）。
 
 ### フラグ・環境変数
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withErrorAlert } from '$lib/enhanceWithAlert';
 	import { parseCopyTemplates, type CopyTemplate } from '$lib/copyTemplates';
 	import type { PageServerData, ActionData } from './$types';
 
@@ -21,12 +22,13 @@
 
 	/** 設定フォーム用 enhance: 保存成功時のフォームリセットを無効化する。
 	 * デフォルトの reset は入力をDOM上のデフォルト値へ戻すため、保存で値が変わらなかった
-	 * 項目（例: 日付境界時刻）が見かけ上空になってしまう。 */
-	const noResetEnhance = () => {
-		return async ({ update }: { update: (opts?: { reset?: boolean }) => Promise<void> }) => {
+	 * 項目（例: 日付境界時刻）が見かけ上空になってしまう。
+	 * withErrorAlert でラップし、error 結果（CSRF拒否等）は alert で通知する。 */
+	const noResetEnhance = withErrorAlert(() => {
+		return async ({ update }) => {
 			await update({ reset: false });
 		};
-	};
+	});
 
 	/** 指定セクションの成功メッセージを表示するか。 */
 	function okFor(section: string): boolean {
@@ -207,7 +209,7 @@
 						</td>
 						<td class="row-actions">
 							<button type="submit" class="btn" form={`upd-${st.id}`}>更新</button>
-							<form method="POST" action="?/deleteStatus" use:enhance style="display:inline">
+							<form method="POST" action="?/deleteStatus" use:enhance={withErrorAlert()} style="display:inline">
 								<input type="hidden" name="id" value={st.id} />
 								<button type="submit" class="btn btn-danger">削除</button>
 							</form>
@@ -218,7 +220,7 @@
 		</table>
 	</div>
 
-	<form method="POST" action="?/addStatus" use:enhance class="add-status card">
+	<form method="POST" action="?/addStatus" use:enhance={withErrorAlert()} class="add-status card">
 		<label>
 			名前
 			<input name="name" placeholder="新しいステータス" required />
@@ -250,7 +252,7 @@
 	{#if errorFor('jira')}
 		<p class="error">{errorFor('jira')}</p>
 	{/if}
-	<form method="POST" action="?/probeJira" use:enhance>
+	<form method="POST" action="?/probeJira" use:enhance={withErrorAlert()}>
 		<button type="submit" class="btn">疎通確認する</button>
 	</form>
 	{#if jiraProbe}

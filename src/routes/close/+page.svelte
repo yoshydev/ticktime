@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { withErrorAlert } from '$lib/enhanceWithAlert';
 	import { goto } from '$app/navigation';
 	import { formatHMS, formatHM } from '$lib/duration';
 	import type { PageServerData, ActionData } from './$types';
@@ -44,7 +45,7 @@
 			この日に走行中のタイマーがあります（<strong>{draft.runningTicketKey}</strong
 			>）。計測に含めるには停止してください。停止するまで確定できません。
 		</p>
-		<form method="POST" action="?/stop" use:enhance>
+		<form method="POST" action="?/stop" use:enhance={withErrorAlert()}>
 			<button type="submit" class="btn">停止して集計に含める</button>
 		</form>
 	</div>
@@ -79,7 +80,7 @@
 {#if draft.rows.length === 0}
 	<p class="muted">この日に対象となるチケットはありません。</p>
 {:else}
-	<form method="POST" action="?/confirm" use:enhance>
+	<form method="POST" action="?/confirm" use:enhance={withErrorAlert()}>
 		<input type="hidden" name="date" value={draft.workDate} />
 		<input type="hidden" name="ticketIds" value={ticketIds} />
 		<div class="table-card">
