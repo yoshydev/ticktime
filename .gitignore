@@ -28,3 +28,8 @@ vite.config.ts.timestamp-*
 
 # セッション引き継ぎドキュメント（ローカル専用）
 HANDOVER.md
+
+# Tauriデスクトップ版のビルド生成物
+/desktop/dist/
+/desktop/src-tauri/target/
+/desktop/src-tauri/gen/
