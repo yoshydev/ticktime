@@ -9,6 +9,7 @@
 // 4. アプリ終了・エラー時にサーバープロセスを確実にkill（最重要）
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod db_path;
 mod http_probe;
 
 use std::io::Write;
@@ -23,7 +24,16 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use uuid::Uuid;
 
+use db_path::{resolve_db_path, Platform};
 use http_probe::{is_ready_response, read_response_head, ProbeResult};
+
+/// DBファイル名。debugビルドは poc-desktop.db に分離し、開発中に誤って
+/// npx版と共有する実DB（ticktime.db）へ触れないよう保護する。
+/// releaseビルドは npx版（bin/lib.js resolveDbPath）と同じ ticktime.db を使う。
+#[cfg(debug_assertions)]
+const DB_FILENAME: &str = "poc-desktop.db";
+#[cfg(not(debug_assertions))]
+const DB_FILENAME: &str = "ticktime.db";
 
 /// 起動リトライの最大試行回数
 const MAX_ATTEMPTS: u32 = 3;
@@ -48,19 +58,6 @@ fn pick_free_port() -> std::io::Result<u16> {
 	let port = listener.local_addr()?.port();
 	drop(listener);
 	Ok(port)
-}
-
-/// PoC用DBパス: $XDG_DATA_HOME（無ければ ~/.local/share）/ticktime/poc-desktop.db
-/// 開発用の data/ticktime.db とは分離する。
-fn db_path() -> PathBuf {
-	let base = std::env::var_os("XDG_DATA_HOME")
-		.map(PathBuf::from)
-		.filter(|p| p.is_absolute())
-		.unwrap_or_else(|| {
-			let home = std::env::var_os("HOME").expect("HOME が設定されていません");
-			PathBuf::from(home).join(".local").join("share")
-		});
-	base.join("ticktime").join("poc-desktop.db")
 }
 
 /// readiness 待ちの失敗理由
@@ -209,7 +206,45 @@ fn main() {
 	let app = tauri::Builder::default()
 		.plugin(tauri_plugin_shell::init())
 		.setup(|app| {
-			let db = db_path();
+			// 実行時プラットフォームを純関数用の Platform に変換
+			let platform = if cfg!(target_os = "windows") {
+				Platform::Windows
+			} else if cfg!(target_os = "macos") {
+				Platform::MacOs
+			} else {
+				Platform::Linux
+			};
+			// TICKTIME_DB が指定されていれば home 不要でそのまま使う
+			// （home 未設定の環境でも TICKTIME_DB 指定で起動できるようにする）
+			let ticktime_db = std::env::var("TICKTIME_DB").ok().filter(|s| !s.is_empty());
+			let resolved = if let Some(db) = ticktime_db {
+				db
+			} else {
+				// home: Windows は USERPROFILE、それ以外は HOME。
+				// 非UTF-8パスは PoC 対象外のため var() で取得する
+				let home_var =
+					if matches!(platform, Platform::Windows) { "USERPROFILE" } else { "HOME" };
+				let Ok(home) = std::env::var(home_var) else {
+					return Err(format!(
+						"ホームディレクトリを特定できません（環境変数 {home_var} が未設定）"
+					)
+					.into());
+				};
+				resolve_db_path(
+					None,
+					std::env::var("LOCALAPPDATA").ok().as_deref(),
+					std::env::var("XDG_DATA_HOME").ok().as_deref(),
+					&home,
+					platform,
+					DB_FILENAME,
+				)
+			};
+			// 相対パス（TICKTIME_DB で指定され得る）は絶対化してからサイドカーへ渡す
+			// （npx版 bin/ticktime.js が path.resolve() するのと互換）
+			let mut db = PathBuf::from(resolved);
+			if db.is_relative() {
+				db = std::env::current_dir()?.join(db);
+			}
 			if let Some(dir) = db.parent() {
 				std::fs::create_dir_all(dir)?;
 			}

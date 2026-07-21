@@ -17,8 +17,18 @@ WebView で表示するデスクトップシェルの PoC。
     health を GET すれば誰でも取得できるため、localhost 露出対策の認可トークンには転用できない
   - サイドカーの stdout/stderr は `[ticktime-server]` プレフィックスで回収
     （1行4096バイト超は切り詰め）。異常終了は code/signal をログし readiness 待ちを即打ち切る
-  - DB は `$XDG_DATA_HOME`（無ければ `~/.local/share`）`/ticktime/poc-desktop.db`。
-    開発用 `data/ticktime.db` とは分離
+  - DB パスは `bin/lib.js` の `resolveDbPath()` と同一の解決（Rust移植: `src/db_path.rs`）:
+    - `TICKTIME_DB` 環境変数が最優先（debug/release 両ビルド共通。相対パスは絶対化される）
+    - Windows: `%LOCALAPPDATA%`（無ければ `%USERPROFILE%\AppData\Local`）`\ticktime\<filename>`
+    - macOS: `~/Library/Application Support/ticktime/<filename>`
+    - Linux ほか: `$XDG_DATA_HOME`（無ければ `~/.local/share`）`/ticktime/<filename>`
+  - filename は debug ビルドが `poc-desktop.db`（開発中に実DBへ触れない保護）、
+    release ビルドが npx 版と同じ `ticktime.db`。
+    **`cargo run --release` も実DB（ticktime.db）に接続する**点に注意
+  - npx 版と同時起動した場合の注意: DB破損は WAL + タイマー排他インデックスで防がれるが、
+    画面状態・タイマー表示が食い違い得る。単一インスタンスでの利用を推奨
+  - 既存 `poc-desktop.db` からの移行: 自動移行はない。必要なら両プロセスを閉じた状態で
+    ファイルを手動コピーする（WAL/SHM ファイルも閉じた状態でコピー）
   - 終了時（ExitRequested/Exit）およびエラー経路でサーバープロセスを kill
 
 ## 前提
@@ -51,7 +61,11 @@ cargo build
 
 対応済み（元・残課題）: ポートレース/誤接続対策（起動 nonce + `/api/health` 照合、最大3回再試行）、
 readiness 判定の堅牢化（`HTTP/1.x` 2xx + nonce ヘッダ照合。`http_probe.rs` に単体テストあり）、
-サイドカーのログ回収（stdout/stderr/終了 code・signal。早期終了の即検知つき）。
+サイドカーのログ回収（stdout/stderr/終了 code・signal。早期終了の即検知つき）、
+DB パス解決の npx 版互換化（`bin/lib.js` `resolveDbPath()` を `src/db_path.rs` へ移植、単体テストあり）、
+`fallbackToSource: true` の確認完了（バイトコード化不能ファイルをソース同梱するフラグ。
+本プロジェクトは公開OSSでソース同梱に不利益なし、pkg assets（`desktop/pkg.config.json`）は
+ビルド出力と better-sqlite3 系のみでシークレット・ローカル設定の混入なし → 維持を決定）。
 
 製品化する場合の残課題（Codex レビュー指摘含む）:
 
@@ -62,8 +76,6 @@ readiness 判定の堅牢化（`HTTP/1.x` 2xx + nonce ヘッダ照合。`http_pr
 - **サイドカーログの redaction**: 現状はサーバー出力を無加工で転送している。サーバー側は
   秘匿情報をログに出さない方針（Jira トークンは HTTP ステータスのみ）だが、製品化時は
   防衛線として `Authorization:` 等をマスクする redaction 層をログポンプに入れる
-- **`fallbackToSource: true`**: 配布時はソース同梱の可否を再確認
-- **DB パス**: `bin/lib.js` の `resolveDbPath()`（プラットフォーム別解決）を Rust 側へ移植
 - **Linux 配布の注意**: 「Node 不要」は満たすが WebKitGTK 等のシステム依存は残る
   （Windows/macOS は WebView が OS 同梱のため問題が小さい）
 
