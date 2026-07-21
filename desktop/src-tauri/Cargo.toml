@@ -10,6 +10,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-shell = "2"
+# 起動毎nonceの生成用（/api/health のヘッダエコー照合に使う）
+uuid = { version = "1", features = ["v4"] }
 
 # 単独クレート（ルートにワークスペースは無いが明示しておく）
 [workspace]
