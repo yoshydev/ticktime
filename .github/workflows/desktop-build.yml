@@ -62,14 +62,15 @@ jobs:
           node -e "require('better-sqlite3'); console.log('better-sqlite3 OK:', process.platform, process.arch)"
           rustc --version
 
-      - name: Rust unit tests (db_path / http_probe)
-        run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
-
       - name: Build server sidecar (esbuild + pkg)
         run: node desktop/build-server.mjs
 
       - name: Smoke test sidecar (health + nonce)
         run: node desktop/scripts/smoke-sidecar.mjs
+
+      # サイドカー生成後でないと tauri-build が externalBin を解決できず build.rs が失敗する
+      - name: Rust unit tests (db_path / http_probe)
+        run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
 
       - name: Tauri bundle
         working-directory: desktop
