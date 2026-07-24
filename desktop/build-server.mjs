@@ -9,7 +9,8 @@
 //   「トップレベル await のみ（export なし）」の形にする。この形なら pkg の
 //   ESM→CJS変換が通り、snapshot 上で起動できる。better-sqlite3 は external を
 //   維持し、snapshot 内の node_modules から require させる（.node は初回起動時に
-//   $HOME/.cache/pkg-native/ へ展開される）。
+//   既定では ~/.cache/pkg/<ハッシュ>/ へ展開される。Windows は
+//   %USERPROFILE%\.cache\pkg\<ハッシュ>\。PKG_NATIVE_CACHE_PATH で変更可）。
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

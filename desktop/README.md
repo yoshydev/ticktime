@@ -116,6 +116,23 @@ macOS（macos-15, arm64）のマトリックスでバンドルを生成し、Art
 xattr -dr com.apple.quarantine /Applications/ticktime.app
 ```
 
+### Windows のインストール先と DB
+
+- インストール先: `%LOCALAPPDATA%\TickTime Desktop`（`tauri.windows.conf.json` の
+  `productName` 由来。exe 名は `mainBinaryName` で `ticktime.exe` を維持）
+- DB はインストール先とは別の `%LOCALAPPDATA%\ticktime\ticktime.db`（npx 版互換のため
+  変更不可・`db_path.rs`）。インストール先と DB を同居させないための分離であり、
+  アンインストールしても DB は残る
+- アンインストーラの「アプリデータ削除」チェックの削除対象は
+  `%LOCALAPPDATA%\dev.yoshy.ticktime`（identifier ベース）で、DB には触れない
+- **旧 PoC 版（`%LOCALAPPDATA%\ticktime` にインストールされた productName=ticktime 版）が
+  入っている場合は、新インストーラの実行前にアンインストールすること**。NSIS 上は
+  productName 変更＝別製品扱いのため、旧版は検出・更新されず「アプリと機能」に2件
+  並び、ショートカットも2つ残る。旧版と新版の同時起動もしないこと（同一 DB を開く）
+- WebView2 のユーザーデータ（キャッシュ・LocalStorage 等）は identifier ベースの
+  `%LOCALAPPDATA%\dev.yoshy.ticktime` 配下のため、productName 変更の影響を受けず
+  旧版と共通のまま（永続データは DB 側のみなのでいずれにせよ影響なし）
+
 ## PoC の範囲と製品化への残課題
 
 検証済み: Node なし環境での単一バイナリ動作（HTML/アセット/form action/WAL/migration）、
