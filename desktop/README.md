@@ -95,8 +95,7 @@ node desktop/scripts/smoke-sidecar.mjs
 `.github/workflows/desktop-build.yml` が Linux（ubuntu-24.04）/ Windows（windows-2025）/
 macOS（macos-15, arm64）のマトリックスでバンドルを生成し、Artifacts にアップロードする。
 
-- トリガー: `workflow_dispatch`（Actions タブから手動実行）。PoC 期間中は
-  `poc/tauri-desktop` への push でも実行される（main マージ時に push トリガーは削除）
+- トリガー: `workflow_dispatch`（Actions タブから手動実行）
 - 成果物: Linux = AppImage + deb、Windows = NSIS インストーラ（`*-setup.exe`）、
   macOS = dmg。リポジトリの Actions → 該当 run → Artifacts からダウンロード
 - 各 OS ランナー上でネイティブビルドする（**クロスビルド非対応** — pkg の Node
@@ -183,7 +182,10 @@ localhost 露出の認可トークン（上記「localhost 認可トークン」
 - **Linux 配布の注意**: 「Node 不要」は満たすが WebKitGTK 等のシステム依存は残る
   （Windows/macOS は WebView が OS 同梱のため問題が小さい）
 - **コード署名 / notarization**: Windows・macOS とも未署名（macOS は Gatekeeper 回避手順で
-  対応、Windows は SmartScreen 警告が出る）。広く配布するなら署名が必要
+  対応、Windows は SmartScreen 警告が出る）。広く配布するなら署名が必要。
+  **スマートアプリコントロール（SAC）有効の Windows 11 では未署名インストーラは
+  MotW の有無によらずブロックされ、回避ボタンも出ない**（SAC 無効化は Windows
+  再インストールなしに再有効化できないため推奨しない）。SAC 環境での動作確認は署名対応後
 
 ## WSLg での注意
 

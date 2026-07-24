@@ -5,10 +5,6 @@ name: desktop-build
 
 on:
   workflow_dispatch:
-  # workflow_dispatch はデフォルトブランチに存在しないと起動できないため、
-  # PoC期間中はブランチpushでも実行する（mainマージ時にこのトリガーは削除する）
-  push:
-    branches: [poc/tauri-desktop]
 
 permissions:
   contents: read
