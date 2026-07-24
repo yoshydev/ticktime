@@ -10,6 +10,9 @@ on:
   push:
     branches: [poc/tauri-desktop]
 
+permissions:
+  contents: read
+
 concurrency:
   group: desktop-build-${{ github.ref }}
   cancel-in-progress: true
@@ -61,6 +64,13 @@ jobs:
         run: |
           node -e "require('better-sqlite3'); console.log('better-sqlite3 OK:', process.platform, process.arch)"
           rustc --version
+
+      # OS非依存の型チェック・ユニットテスト（Linux jobでのみ実行して時間を節約）
+      - name: Type check + unit tests
+        if: runner.os == 'Linux'
+        run: |
+          npm run check
+          npm run test
 
       - name: Build server sidecar (esbuild + pkg)
         run: node desktop/build-server.mjs

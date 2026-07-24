@@ -15,6 +15,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildSync } from 'esbuild';
+import { resolveHostPlatform } from './platform-map.mjs';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildEntry = path.join(rootDir, 'build', 'index.js');
@@ -22,25 +23,8 @@ const stagingDir = path.join(rootDir, 'desktop', 'dist', 'staging');
 const bundlePath = path.join(stagingDir, 'server.mjs');
 const configPath = path.join(rootDir, 'desktop', 'pkg.config.json');
 
-// プラットフォームマップ: ホストの process.platform-process.arch から
-// pkg ターゲットと Tauri の target triple を導出する。
-// 環境変数での上書きは意図的に設けない（クロスビルド非対応 — pkg の Node
-// プレビルトも better-sqlite3 の .node もホストOS依存のため、各OS上で
-// ネイティブビルドする前提）。
-const platformMap = {
-	'linux-x64': { pkgTarget: 'node24-linux-x64', triple: 'x86_64-unknown-linux-gnu', exe: '' },
-	'darwin-arm64': { pkgTarget: 'node24-macos-arm64', triple: 'aarch64-apple-darwin', exe: '' },
-	'darwin-x64': { pkgTarget: 'node24-macos-x64', triple: 'x86_64-apple-darwin', exe: '' },
-	'win32-x64': { pkgTarget: 'node24-win-x64', triple: 'x86_64-pc-windows-msvc', exe: '.exe' }
-};
-const platformKey = `${process.platform}-${process.arch}`;
-const plat = platformMap[platformKey];
-if (!plat) {
-	console.error(
-		`[desktop:build-server] 未対応のプラットフォームです: ${platformKey}（対応: ${Object.keys(platformMap).join(', ')}）`
-	);
-	process.exit(1);
-}
+// プラットフォーム導出は desktop/platform-map.mjs に集約（クロスビルド非対応の理由もそちら参照）
+const plat = resolveHostPlatform('[desktop:build-server]');
 // Tauri サイドカーの命名規則: <name>-<target-triple>
 // Windows では <name>-<triple>.exe を厳密に要求するため .exe を明示付与する
 const output = path.join(rootDir, 'desktop', 'dist', `ticktime-server-${plat.triple}${plat.exe}`);

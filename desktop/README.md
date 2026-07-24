@@ -6,7 +6,8 @@ WebView で表示するデスクトップシェルの PoC。
 ## 構成
 
 - `build-server.mjs` — SvelteKit ビルドを esbuild + @yao-pkg/pkg で単一バイナリ化（Step 1）
-  - 出力: `dist/ticktime-server-x86_64-unknown-linux-gnu`
+  - 出力: `dist/ticktime-server-<target-triple>`（例: `ticktime-server-x86_64-unknown-linux-gnu`。
+    Windows は `.exe` 付き）。triple はホストOSから導出（`platform-map.mjs`）
 - `src-tauri/` — Tauri v2 シェル（Step 2）
   - 起動シーケンス: 空きポート確保 → 起動毎 nonce 生成 → サイドカー spawn
     （PORT/HOST/ORIGIN/TICKTIME_DB/TICKTIME_STARTUP_NONCE）→
