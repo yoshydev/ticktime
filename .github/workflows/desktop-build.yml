@@ -1,0 +1,90 @@
+# Tauriデスクトップ版の3OSビルド（PoC）。workflow_dispatch 手動実行のみ。
+# 各OSランナー上でネイティブビルドする（クロスビルド非対応 — pkg のNodeプレビルトと
+# better-sqlite3 の .node がホストOS依存のため）。成果物はArtifactsからダウンロードする。
+name: desktop-build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            bundles: appimage,deb
+            artifacts: |
+              desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+              desktop/src-tauri/target/release/bundle/deb/*.deb
+          - os: windows-2025
+            bundles: nsis
+            artifacts: desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+          - os: macos-15 # arm64。Intel Mac が必要になったら macos-13 を追加する
+            bundles: dmg
+            artifacts: desktop/src-tauri/target/release/bundle/dmg/*.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system deps (WebKitGTK ほか Tauri 依存)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev \
+            libxdo-dev libayatana-appindicator3-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # pkg の node24 ターゲットと揃える
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - run: npm ci
+
+      - name: Verify better-sqlite3 native addon
+        run: |
+          node -e "require('better-sqlite3'); console.log('better-sqlite3 OK:', process.platform, process.arch)"
+          rustc --version
+
+      # OS非依存の型チェック・ユニットテスト（Linux jobでのみ実行して時間を節約）
+      - name: Type check + unit tests
+        if: runner.os == 'Linux'
+        run: |
+          npm run check
+          npm run test
+
+      - name: Build server sidecar (esbuild + pkg)
+        run: node desktop/build-server.mjs
+
+      - name: Smoke test sidecar (health + nonce)
+        run: node desktop/scripts/smoke-sidecar.mjs
+
+      # サイドカー生成後でないと tauri-build が externalBin を解決できず build.rs が失敗する
+      - name: Rust unit tests (db_path / http_probe)
+        run: cargo test --manifest-path desktop/src-tauri/Cargo.toml
+
+      - name: Tauri bundle
+        working-directory: desktop
+        run: npx --no-install tauri build --bundles ${{ matrix.bundles }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ticktime-${{ matrix.os }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 14

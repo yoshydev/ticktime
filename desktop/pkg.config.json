@@ -1,0 +1,17 @@
+{
+	"name": "ticktime-server",
+	"pkg": {
+		"fallbackToSource": true,
+		"assets": [
+			"dist/staging/client/**/*",
+			"dist/staging/prerendered/**/*",
+			"../node_modules/better-sqlite3/package.json",
+			"../node_modules/better-sqlite3/lib/**/*.js",
+			"../node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+			"../node_modules/bindings/package.json",
+			"../node_modules/bindings/bindings.js",
+			"../node_modules/file-uri-to-path/package.json",
+			"../node_modules/file-uri-to-path/index.js"
+		]
+	}
+}
