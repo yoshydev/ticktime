@@ -14,19 +14,41 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildSync } from 'esbuild';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const buildEntry = path.join(rootDir, 'build', 'index.js');
 const stagingDir = path.join(rootDir, 'desktop', 'dist', 'staging');
 const bundlePath = path.join(stagingDir, 'server.mjs');
 const configPath = path.join(rootDir, 'desktop', 'pkg.config.json');
-// Tauri サイドカーの命名規則: <name>-<target-triple>
-const output = path.join(rootDir, 'desktop', 'dist', 'ticktime-server-x86_64-unknown-linux-gnu');
-const target = 'node24-linux-x64';
 
-function run(cmd, args, label) {
+// プラットフォームマップ: ホストの process.platform-process.arch から
+// pkg ターゲットと Tauri の target triple を導出する。
+// 環境変数での上書きは意図的に設けない（クロスビルド非対応 — pkg の Node
+// プレビルトも better-sqlite3 の .node もホストOS依存のため、各OS上で
+// ネイティブビルドする前提）。
+const platformMap = {
+	'linux-x64': { pkgTarget: 'node24-linux-x64', triple: 'x86_64-unknown-linux-gnu', exe: '' },
+	'darwin-arm64': { pkgTarget: 'node24-macos-arm64', triple: 'aarch64-apple-darwin', exe: '' },
+	'darwin-x64': { pkgTarget: 'node24-macos-x64', triple: 'x86_64-apple-darwin', exe: '' },
+	'win32-x64': { pkgTarget: 'node24-win-x64', triple: 'x86_64-pc-windows-msvc', exe: '.exe' }
+};
+const platformKey = `${process.platform}-${process.arch}`;
+const plat = platformMap[platformKey];
+if (!plat) {
+	console.error(
+		`[desktop:build-server] 未対応のプラットフォームです: ${platformKey}（対応: ${Object.keys(platformMap).join(', ')}）`
+	);
+	process.exit(1);
+}
+// Tauri サイドカーの命名規則: <name>-<target-triple>
+// Windows では <name>-<triple>.exe を厳密に要求するため .exe を明示付与する
+const output = path.join(rootDir, 'desktop', 'dist', `ticktime-server-${plat.triple}${plat.exe}`);
+const target = plat.pkgTarget;
+
+function run(cmd, args, label, options = {}) {
 	console.log(`[desktop:build-server] ${label}`);
-	const res = spawnSync(cmd, args, { cwd: rootDir, stdio: 'inherit' });
+	const res = spawnSync(cmd, args, { cwd: rootDir, stdio: 'inherit', ...options });
 	if (res.error) {
 		console.error(`[desktop:build-server] ${label} を起動できませんでした: ${res.error.message}`);
 		process.exit(1);
@@ -47,7 +69,8 @@ if (process.argv.includes('--skip-svelte-build')) {
 	}
 	console.log('[desktop:build-server] SvelteKit build をスキップ（--skip-svelte-build）');
 } else {
-	run('npm', ['run', 'build'], 'SvelteKit build');
+	// Windows の npm は .cmd のため shell 経由でないと spawn できない
+	run('npm', ['run', 'build'], 'SvelteKit build', { shell: process.platform === 'win32' });
 }
 
 const addon = path.join(rootDir, 'node_modules', 'better-sqlite3', 'build', 'Release', 'better_sqlite3.node');
@@ -57,20 +80,25 @@ if (!existsSync(addon)) {
 }
 
 // 2. esbuild で単一ESMファイル化（better-sqlite3 は external 維持）
+// .bin/esbuild はネイティブ実行ファイルで、Windows の .bin は cmd シムのため
+// spawn できない。3OS共通で動く JS API（buildSync）を使う。
 rmSync(stagingDir, { recursive: true, force: true });
 mkdirSync(stagingDir, { recursive: true });
-run(
-	path.join(rootDir, 'node_modules', '.bin', 'esbuild'),
-	[
-		buildEntry,
-		'--bundle',
-		'--platform=node',
-		'--format=esm',
-		'--external:better-sqlite3',
-		`--outfile=${bundlePath}`
-	],
-	'esbuild バンドル'
-);
+console.log('[desktop:build-server] esbuild バンドル');
+try {
+	buildSync({
+		entryPoints: [buildEntry],
+		bundle: true,
+		platform: 'node',
+		format: 'esm',
+		external: ['better-sqlite3'],
+		outfile: bundlePath,
+		logLevel: 'info'
+	});
+} catch (e) {
+	console.error(`[desktop:build-server] esbuild バンドル が失敗しました: ${e instanceof Error ? e.message : e}`);
+	process.exit(1);
+}
 
 // 3. 末尾の export 文を除去（pkg のESM→CJS変換は「TLA+export 併存」を変換できないため）
 const bundled = readFileSync(bundlePath, 'utf8');
@@ -95,9 +123,18 @@ if (existsSync(prerendered)) {
 }
 
 // 5. pkg で単一実行ファイル化
+// .bin/pkg は Windows で cmd シムのため spawn できない。node 自身（process.execPath）で
+// @yao-pkg/pkg の bin エントリ（package.json の bin フィールド: lib-es5/bin.js）を直接起動する。
+const pkgBin = path.join(rootDir, 'node_modules', '@yao-pkg', 'pkg', 'lib-es5', 'bin.js');
+if (!existsSync(pkgBin)) {
+	console.error(
+		`[desktop:build-server] pkg の bin エントリが見つかりません: ${pkgBin}（@yao-pkg/pkg の内部構成が変わった可能性があります）`
+	);
+	process.exit(1);
+}
 run(
-	path.join(rootDir, 'node_modules', '.bin', 'pkg'),
-	['--config', configPath, '--target', target, '--output', output, bundlePath],
+	process.execPath,
+	[pkgBin, '--config', configPath, '--target', target, '--output', output, bundlePath],
 	'pkg ビルド'
 );
 
