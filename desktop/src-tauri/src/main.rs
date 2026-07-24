@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use tauri::webview::{NewWindowFeatures, NewWindowResponse};
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -85,28 +86,74 @@ impl std::fmt::Display for WaitError {
 /// ログ1行の最大出力バイト数。超過分は切り詰めて「…」を付ける。
 const MAX_LOG_LINE_BYTES: usize = 4096;
 
+/// `token=<英数字列>` を `token=***` にマスクする。
+/// サイドカーがリクエストラインをログ出力した場合に認可トークンが
+/// デスクトップ側のログへ漏れるのを防ぐ（正規表現crateを増やさず手書きスキャン）。
+fn redact_token(s: &str) -> String {
+	const NEEDLE: &str = "token=";
+	let mut out = String::with_capacity(s.len());
+	let mut rest = s;
+	while let Some(pos) = rest.find(NEEDLE) {
+		let after = pos + NEEDLE.len();
+		out.push_str(&rest[..after]);
+		let tail = &rest[after..];
+		// `token=` 直後に続く英数字列がトークン本体。非英数字（& や空白等）で終端
+		let token_len =
+			tail.find(|c: char| !c.is_ascii_alphanumeric()).unwrap_or(tail.len());
+		if token_len > 0 {
+			out.push_str("***");
+		}
+		rest = &tail[token_len..];
+	}
+	out.push_str(rest);
+	out
+}
+
+/// 行中の secret 完全一致出現をすべて `***` に置換する。
+/// `token=` ヒューリスティック（redact_token）を通り抜ける形式
+/// （JSONログ・別パラメータ名等）でも認可トークンの漏出を防ぐ最終防衛線。
+/// secret が空文字なら何もしない（全文字間に `***` が挟まる事故防止）。
+fn redact_secret(line: &str, secret: &str) -> String {
+	if secret.is_empty() {
+		return line.to_owned();
+	}
+	line.replace(secret, "***")
+}
+
 fn format_log_line(bytes: &[u8]) -> String {
-	if bytes.len() > MAX_LOG_LINE_BYTES {
+	let s = if bytes.len() > MAX_LOG_LINE_BYTES {
 		let mut s = String::from_utf8_lossy(&bytes[..MAX_LOG_LINE_BYTES]).into_owned();
 		s.push('…');
 		s
 	} else {
 		// 行末の改行は println!/eprintln! 側で付くため落とす（二重改行防止）
 		String::from_utf8_lossy(bytes).trim_end_matches(['\r', '\n']).to_owned()
-	}
+	};
+	redact_token(&s)
 }
 
 /// サイドカーのCommandEventチャネルを受信し、ログ出力と早期終了検知を行う。
 /// Terminated 受信時に exited フラグを立て、wait_for_server が即座に打ち切れるようにする。
-fn spawn_log_pump(mut rx: tauri::async_runtime::Receiver<CommandEvent>, exited: Arc<AtomicBool>) {
+/// auth_token はログ転送前に完全一致マスクするために受け取る（ログ出力は禁止）。
+fn spawn_log_pump(
+	mut rx: tauri::async_runtime::Receiver<CommandEvent>,
+	exited: Arc<AtomicBool>,
+	auth_token: String,
+) {
 	tauri::async_runtime::spawn(async move {
 		while let Some(event) = rx.recv().await {
 			match event {
 				CommandEvent::Stdout(line) => {
-					println!("[ticktime-server] {}", format_log_line(&line));
+					println!(
+						"[ticktime-server] {}",
+						redact_secret(&format_log_line(&line), &auth_token)
+					);
 				}
 				CommandEvent::Stderr(line) => {
-					eprintln!("[ticktime-server] {}", format_log_line(&line));
+					eprintln!(
+						"[ticktime-server] {}",
+						redact_secret(&format_log_line(&line), &auth_token)
+					);
 				}
 				CommandEvent::Error(e) => {
 					eprintln!("[ticktime-server] イベント受信エラー: {e}");
@@ -161,17 +208,67 @@ fn wait_for_server(
 	Err(WaitError::Timeout)
 }
 
+/// 起動成功した1試行分の結果。auth_token はログ・エラー文字列に出さないこと。
+struct StartedServer {
+	child: CommandChild,
+	origin: String,
+	auth_token: String,
+}
+
+/// ブートストラップURLを組み立てる。トークンはhexのみなのでURLエンコード不要
+/// （hex以外の文字を含むトークンに変更する場合はエンコード必須）。
+fn build_bootstrap_url(origin: &str, auth_token: &str) -> String {
+	format!("{origin}/auth?token={auth_token}")
+}
+
+/// WebViewのナビゲーション/新規ウィンドウ要求の分類結果
+#[derive(Debug, PartialEq, Eq)]
+enum NavDecision {
+	/// アプリorigin（scheme+host+port一致）: WebView内遷移として許可
+	SameOrigin,
+	/// 外部の http/https（Jiraリンク・報告URL等）: OSブラウザで開く
+	OpenExternal,
+	/// それ以外のスキーム: 単に拒否
+	Deny,
+}
+
+/// 遷移先URLをアプリoriginと比較して分類する（on_navigation / on_new_window 共通）。
+/// ポートは port_or_known_default で比較し、`http://localhost:80` のような
+/// ポート省略表記でも正しく判定する。
+fn classify_navigation(url: &tauri::Url, app_origin: &tauri::Url) -> NavDecision {
+	let same_origin = url.scheme() == app_origin.scheme()
+		&& url.host() == app_origin.host()
+		&& url.port_or_known_default() == app_origin.port_or_known_default();
+	if same_origin {
+		NavDecision::SameOrigin
+	} else if matches!(url.scheme(), "http" | "https") {
+		NavDecision::OpenExternal
+	} else {
+		NavDecision::Deny
+	}
+}
+
+/// 外部URLをOSブラウザで開く（失敗してもURL自体はログに出さない）
+fn open_in_os_browser(handle: &tauri::AppHandle, url: &tauri::Url) {
+	// shell().open は tauri-plugin-opener への移行が推奨されているが、
+	// 依存を増やさない方針のため既存の shell プラグインを使う
+	#[allow(deprecated)]
+	if let Err(e) = handle.shell().open(url.as_str(), None) {
+		eprintln!("[ticktime-desktop] 外部ブラウザでのURLオープンに失敗: {e}");
+	}
+}
+
 /// 1回分の起動試行: ポート確保 → nonce生成 → spawn → readiness待ち。
 /// 失敗時は子プロセスをkillしてからエラー文字列を返す（呼び出し側でリトライ）。
-fn try_start_server(
-	app: &tauri::App,
-	db: &Path,
-) -> Result<(CommandChild, String), String> {
+fn try_start_server(app: &tauri::App, db: &Path) -> Result<StartedServer, String> {
 	let port = pick_free_port().map_err(|e| format!("空きポートの取得に失敗: {e}"))?;
 	let origin = format!("http://localhost:{port}");
 	// 起動毎に新しいnonceを生成し、/api/health のヘッダエコーで「自分が起動した
 	// サーバー」であることを確認する（ポートレース・誤接続対策）
 	let nonce = Uuid::new_v4().to_string();
+	// 認可トークン。nonce は /api/health で公開されるため転用不可、これは別物。
+	// UUIDv4 2本の連結で約244bitのランダム性（64文字hex）。ログに出さないこと。
+	let auth_token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
 
 	let (rx, child) = app
 		.shell()
@@ -182,16 +279,17 @@ fn try_start_server(
 		.env("ORIGIN", &origin)
 		.env("TICKTIME_DB", db.to_string_lossy().to_string())
 		.env("TICKTIME_STARTUP_NONCE", &nonce)
+		.env("TICKTIME_AUTH_TOKEN", &auth_token)
 		.spawn()
 		.map_err(|e| format!("サイドカーのspawnに失敗: {e}"))?;
 	println!("[ticktime-desktop] サーバー起動: {origin} (db: {})", db.display());
 
-	// ログ回収 + 早期終了検知
+	// ログ回収 + 早期終了検知（auth_token はログ転送前の完全一致マスク用）
 	let exited = Arc::new(AtomicBool::new(false));
-	spawn_log_pump(rx, Arc::clone(&exited));
+	spawn_log_pump(rx, Arc::clone(&exited), auth_token.clone());
 
 	match wait_for_server(port, &nonce, &exited, WAIT_TIMEOUT) {
-		Ok(()) => Ok((child, origin)),
+		Ok(()) => Ok(StartedServer { child, origin, auth_token }),
 		Err(e) => {
 			// この試行の子プロセスはその場でkillしてから次の試行へ
 			if let Err(ke) = child.kill() {
@@ -249,8 +347,8 @@ fn main() {
 				std::fs::create_dir_all(dir)?;
 			}
 
-			// 新ポート + 新nonce で最大 MAX_ATTEMPTS 回まで起動を試みる
-			let mut started: Option<(CommandChild, String)> = None;
+			// 新ポート + 新nonce + 新認可トークンで最大 MAX_ATTEMPTS 回まで起動を試みる
+			let mut started: Option<StartedServer> = None;
 			let mut last_err = String::new();
 			for attempt in 1..=MAX_ATTEMPTS {
 				match try_start_server(app, &db) {
@@ -266,7 +364,7 @@ fn main() {
 					}
 				}
 			}
-			let Some((child, origin)) = started else {
+			let Some(StartedServer { child, origin, auth_token }) = started else {
 				// 失敗した試行の子プロセスは try_start_server 内でkill済み
 				return Err(format!(
 					"サーバー起動に{MAX_ATTEMPTS}回失敗しました（最後の失敗: {last_err}）"
@@ -278,11 +376,40 @@ fn main() {
 			// できるよう、ready確定直後に state へ登録する
 			app.manage(ServerProcess(Mutex::new(Some(child))));
 
+			// 初回ロードはブートストラップURL（/auth?token=...）。SvelteKit側が
+			// トークンをCookieへ移し替えてトップへリダイレクトする。
+			// このURL・トークンはログ・エラー文字列に一切出さないこと。
+			let bootstrap_url = build_bootstrap_url(&origin, &auth_token);
+
+			// アプリorigin（scheme+host+port）と一致する遷移のみWebView内で許可し、
+			// 外部の http/https はOSブラウザへ委譲する（classify_navigation で判定）
+			let app_origin: tauri::Url = origin.parse()?;
+			let nav_origin = app_origin.clone();
+			let nav_handle = app.handle().clone();
+			let new_window_origin = app_origin.clone();
+			let new_window_handle = app.handle().clone();
 			let window = WebviewWindowBuilder::new(
 				app,
 				"main",
-				WebviewUrl::External(origin.parse()?),
+				WebviewUrl::External(bootstrap_url.parse()?),
 			)
+			.on_navigation(move |url| match classify_navigation(url, &nav_origin) {
+				NavDecision::SameOrigin => true,
+				NavDecision::OpenExternal => {
+					open_in_os_browser(&nav_handle, url);
+					false
+				}
+				NavDecision::Deny => false,
+			})
+			// target="_blank" や window.open は on_navigation を通らずここに来る。
+			// 外部 http/https はOSブラウザへ委譲し、新規ウィンドウ生成は常に拒否する
+			// （アプリは同一originの_blankを使わないため SameOrigin も拒否でよい）
+			.on_new_window(move |url, _features: NewWindowFeatures| {
+				if classify_navigation(&url, &new_window_origin) == NavDecision::OpenExternal {
+					open_in_os_browser(&new_window_handle, &url);
+				}
+				NewWindowResponse::Deny
+			})
 			.title("ticktime")
 			.inner_size(1100.0, 800.0)
 			.build();
@@ -306,4 +433,119 @@ fn main() {
 		}
 		_ => {}
 	});
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{
+		build_bootstrap_url, classify_navigation, redact_secret, redact_token, NavDecision,
+	};
+
+	#[test]
+	fn redact_token_はトークンをマスクする() {
+		assert_eq!(redact_token("token=abc123"), "token=***");
+	}
+
+	#[test]
+	fn redact_token_は行途中のトークンもマスクする() {
+		assert_eq!(
+			redact_token("GET /auth?token=deadbeef01 HTTP/1.1"),
+			"GET /auth?token=*** HTTP/1.1"
+		);
+	}
+
+	#[test]
+	fn redact_token_は複数出現をすべてマスクする() {
+		assert_eq!(
+			redact_token("a token=AAA1 b token=BBB2"),
+			"a token=*** b token=***"
+		);
+	}
+
+	#[test]
+	fn redact_token_はトークン本体なしなら変更しない() {
+		// `token=` 直後に英数字が続かない場合はマスク対象がない
+		assert_eq!(redact_token("token="), "token=");
+		assert_eq!(redact_token("token=&x=1"), "token=&x=1");
+	}
+
+	#[test]
+	fn redact_token_はtokenを含まない行を変更しない() {
+		let line = "[ticktime-server] listening on 127.0.0.1:5173";
+		assert_eq!(redact_token(line), line);
+	}
+
+	#[test]
+	fn redact_token_はクエリ区切りで終端する() {
+		assert_eq!(redact_token("token=abc123&next=/"), "token=***&next=/");
+	}
+
+	#[test]
+	fn redact_secret_は完全一致出現をマスクする() {
+		assert_eq!(redact_secret("Bearer cafe01", "cafe01"), "Bearer ***");
+	}
+
+	#[test]
+	fn redact_secret_は複数出現と行途中もマスクする() {
+		assert_eq!(
+			redact_secret(r#"{"a":"SEC","b":"xSECy"}"#, "SEC"),
+			r#"{"a":"***","b":"x***y"}"#
+		);
+	}
+
+	#[test]
+	fn redact_secret_はsecretが空文字なら何もしない() {
+		assert_eq!(redact_secret("abc", ""), "abc");
+	}
+
+	#[test]
+	fn redact_secret_はsecretを含まない行を変更しない() {
+		assert_eq!(redact_secret("listening on 127.0.0.1", "cafe01"), "listening on 127.0.0.1");
+	}
+
+	fn url(s: &str) -> tauri::Url {
+		s.parse().expect("テスト用URLのparseに失敗")
+	}
+
+	#[test]
+	fn classify_navigation_は同一originを許可する() {
+		let origin = url("http://localhost:4321");
+		assert_eq!(
+			classify_navigation(&url("http://localhost:4321/history"), &origin),
+			NavDecision::SameOrigin
+		);
+	}
+
+	#[test]
+	fn classify_navigation_はポート違いを外部として扱う() {
+		let origin = url("http://localhost:4321");
+		assert_eq!(
+			classify_navigation(&url("http://localhost:9999/"), &origin),
+			NavDecision::OpenExternal
+		);
+	}
+
+	#[test]
+	fn classify_navigation_は外部httpsをブラウザ委譲にする() {
+		let origin = url("http://localhost:4321");
+		assert_eq!(
+			classify_navigation(&url("https://example.atlassian.net/browse/T-1"), &origin),
+			NavDecision::OpenExternal
+		);
+	}
+
+	#[test]
+	fn classify_navigation_はhttp_https以外のスキームを拒否する() {
+		let origin = url("http://localhost:4321");
+		assert_eq!(classify_navigation(&url("mailto:a@example.com"), &origin), NavDecision::Deny);
+		assert_eq!(classify_navigation(&url("file:///etc/passwd"), &origin), NavDecision::Deny);
+	}
+
+	#[test]
+	fn build_bootstrap_url_は形式どおりに組み立てる() {
+		assert_eq!(
+			build_bootstrap_url("http://localhost:4321", "cafe0123"),
+			"http://localhost:4321/auth?token=cafe0123"
+		);
+	}
 }

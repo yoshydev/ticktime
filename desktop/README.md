@@ -9,13 +9,13 @@ WebView で表示するデスクトップシェルの PoC。
   - 出力: `dist/ticktime-server-<target-triple>`（例: `ticktime-server-x86_64-unknown-linux-gnu`。
     Windows は `.exe` 付き）。triple はホストOSから導出（`platform-map.mjs`）
 - `src-tauri/` — Tauri v2 シェル（Step 2）
-  - 起動シーケンス: 空きポート確保 → 起動毎 nonce 生成 → サイドカー spawn
-    （PORT/HOST/ORIGIN/TICKTIME_DB/TICKTIME_STARTUP_NONCE）→
+  - 起動シーケンス: 空きポート確保 → 起動毎 nonce + 認可トークン生成 → サイドカー spawn
+    （PORT/HOST/ORIGIN/TICKTIME_DB/TICKTIME_STARTUP_NONCE/TICKTIME_AUTH_TOKEN）→
     `GET /api/health` が 2xx かつ `x-ticktime-nonce` ヘッダで nonce をエコーするまで
-    ポーリング（最大10秒/試行）→ ウィンドウ作成。
-    失敗時（早期終了・nonce 不一致・タイムアウト）は新ポート + 新 nonce で最大3回まで再試行
+    ポーリング（最大10秒/試行）→ `/auth?token=<認可トークン>` でウィンドウ作成。
+    失敗時（早期終了・nonce 不一致・タイムアウト）は新ポート + 新 nonce + 新トークンで最大3回まで再試行
   - nonce は「自分が spawn したサーバーか」の識別（ポートレース・誤接続検出）専用。
-    health を GET すれば誰でも取得できるため、localhost 露出対策の認可トークンには転用できない
+    health を GET すれば誰でも取得できるため、認可トークンとは別物（下記「localhost 認可トークン」）
   - サイドカーの stdout/stderr は `[ticktime-server]` プレフィックスで回収
     （1行4096バイト超は切り詰め）。異常終了は code/signal をログし readiness 待ちを即打ち切る
   - DB パスは `bin/lib.js` の `resolveDbPath()` と同一の解決（Rust移植: `src/db_path.rs`）:
@@ -116,6 +116,30 @@ macOS（macos-15, arm64）のマトリックスでバンドルを生成し、Art
 xattr -dr com.apple.quarantine /Applications/ticktime.app
 ```
 
+## localhost 認可トークン
+
+デスクトップ版はサーバーを 127.0.0.1 の動的ポートで起動するため、同一マシンの
+他プロセスからも到達可能。これを起動毎生成の認可トークンで防いでいる。
+
+- Tauri シェルが起動毎に 64文字hex のトークンを生成し、env `TICKTIME_AUTH_TOKEN` で
+  サイドカーへ渡す。WebView は `/auth?token=<トークン>` を開き、サーバー
+  （`src/hooks.server.ts` + `src/lib/server/authGuard.ts`）がタイミングセーフ照合の上、
+  HttpOnly + SameSite=Strict の session cookie を発行して `/` へ 303 リダイレクト。
+  以後の全リクエストは cookie 照合（不一致は 401）
+- 除外は `GET/HEAD /api/health`（完全一致）のみ。ブートストラップ `/auth` は
+  GET・token パラメータちょうど1個のみ受理（既存 cookie では通さない）
+- **npx 版・vite dev は env 未設定のため認可層は完全に無効**（従来どおり認証なし）
+- WebView のナビゲーションは `on_navigation` でアプリ origin に制限し、
+  外部リンク（Jira・報告URL等）は OS ブラウザで開く（token/cookie 文脈の持ち出し防止）
+- **無認可で公開される範囲**: client assets（`/_app/*`）・`static/` 配下・prerender 済み
+  ページは adapter-node が SvelteKit hooks より前に配信するため認可対象外。
+  ここに機密を置かないこと
+- **脅威モデルの限界**: 防御対象は「ポート到達のみの非対話プロセス」。同一ユーザー権限の
+  悪意あるプロセスが env（`/proc/<pid>/environ`）・プロセスメモリ・WebView データへ
+  アクセスできる場合は防げない
+- cookie 消失時（WebView データクリア等）は全リクエスト 401 になる。回復はアプリ再起動
+  （401 文言でも案内。PoC の許容範囲）
+
 ### Windows のインストール先と DB
 
 - インストール先: `%LOCALAPPDATA%\TickTime Desktop`（`tauri.windows.conf.json` の
@@ -142,6 +166,7 @@ xattr -dr com.apple.quarantine /Applications/ticktime.app
 readiness 判定の堅牢化（`HTTP/1.x` 2xx + nonce ヘッダ照合。`http_probe.rs` に単体テストあり）、
 サイドカーのログ回収（stdout/stderr/終了 code・signal。早期終了の即検知つき）、
 DB パス解決の npx 版互換化（`bin/lib.js` `resolveDbPath()` を `src/db_path.rs` へ移植、単体テストあり）、
+localhost 露出の認可トークン（上記「localhost 認可トークン」。smoke テストで契約検証）、
 `fallbackToSource: true` の確認完了（バイトコード化不能ファイルをソース同梱するフラグ。
 本プロジェクトは公開OSSでソース同梱に不利益なし、pkg assets（`desktop/pkg.config.json`）は
 ビルド出力と better-sqlite3 系のみでシークレット・ローカル設定の混入なし → 維持を決定）、
@@ -150,11 +175,11 @@ DB パス解決の npx 版互換化（`bin/lib.js` `resolveDbPath()` を `src/db
 
 製品化する場合の残課題（Codex レビュー指摘含む）:
 
-- **localhost 露出**: サーバーは他プロセスからも到達可能。起動時生成トークンでの防御を検討
-  （起動 nonce は health で誰でも取得できるため転用不可。認可用は別トークンが必要）
-- **サイドカーログの redaction**: 現状はサーバー出力を無加工で転送している。サーバー側は
-  秘匿情報をログに出さない方針（Jira トークンは HTTP ステータスのみ）だが、製品化時は
-  防衛線として `Authorization:` 等をマスクする redaction 層をログポンプに入れる
+- **サイドカーログの redaction の拡充**: `token=` クエリのマスクはログポンプに実装済み。
+  サーバー側は秘匿情報をログに出さない方針（Jira トークンは HTTP ステータスのみ）だが、
+  製品化時は防衛線として `Authorization:` ヘッダ等のマスクも追加する
+- **cookie 消失時の再ブートストラップ**: 現状はアプリ再起動が必要。Rust 側が保持する
+  トークンで自動再認可する仕組みは未実装（PoC では許容）
 - **Linux 配布の注意**: 「Node 不要」は満たすが WebKitGTK 等のシステム依存は残る
   （Windows/macOS は WebView が OS 同梱のため問題が小さい）
 - **コード署名 / notarization**: Windows・macOS とも未署名（macOS は Gatekeeper 回避手順で
