@@ -81,11 +81,44 @@ cargo build
 ./target/debug/ticktime-desktop   # または cargo run
 ```
 
+### サイドカー単体スモークテスト
+
+GUI なしでサイドカーの起動契約（health + nonce エコー）だけを検証できる（CI でも使用）:
+
+```sh
+node desktop/scripts/smoke-sidecar.mjs
+```
+
+## 3OS ビルド（GitHub Actions）
+
+`.github/workflows/desktop-build.yml` が Linux（ubuntu-24.04）/ Windows（windows-2025）/
+macOS（macos-15, arm64）のマトリックスでバンドルを生成し、Artifacts にアップロードする。
+
+- トリガー: `workflow_dispatch`（Actions タブから手動実行）。PoC 期間中は
+  `poc/tauri-desktop` への push でも実行される（main マージ時に push トリガーは削除）
+- 成果物: Linux = AppImage + deb、Windows = NSIS インストーラ（`*-setup.exe`）、
+  macOS = dmg。リポジトリの Actions → 該当 run → Artifacts からダウンロード
+- 各 OS ランナー上でネイティブビルドする（**クロスビルド非対応** — pkg の Node
+  プレビルトも better-sqlite3 の `.node` もホスト OS 依存のため）。
+  `build-server.mjs` はホストの `process.platform`-`process.arch` から
+  pkg target / target triple を導出する（Windows はサイドカーに `.exe` を明示付与）
+- バージョンは `package.json` が単一ソース（`tauri.conf.json` の `version` は
+  `"../../package.json"` 参照。`Cargo.toml` の version は crate 用でバンドルには使われない）
+- macOS は arm64（Apple Silicon）のみ。Intel Mac が必要になったら matrix に
+  `macos-13` を追加する（プラットフォームマップには x64 エントリ定義済み）
+
+### macOS で開く（Gatekeeper）
+
+未署名 dmg のため、初回はダウンロード後に quarantine 属性の除去が必要:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/ticktime.app
+```
+
 ## PoC の範囲と製品化への残課題
 
-本 PoC は Linux x64 のみ対象（出力名・pkg target とも固定）。検証済み: Node なし環境での
-単一バイナリ動作（HTML/アセット/form action/WAL/migration）、ウィンドウ表示、正常終了・
-タイムアウト経路のプロセス回収。
+検証済み: Node なし環境での単一バイナリ動作（HTML/アセット/form action/WAL/migration）、
+ウィンドウ表示、正常終了・タイムアウト経路のプロセス回収、3OS の CI ビルド（上記）。
 
 対応済み（元・残課題）: ポートレース/誤接続対策（起動 nonce + `/api/health` 照合、最大3回再試行）、
 readiness 判定の堅牢化（`HTTP/1.x` 2xx + nonce ヘッダ照合。`http_probe.rs` に単体テストあり）、
@@ -93,12 +126,12 @@ readiness 判定の堅牢化（`HTTP/1.x` 2xx + nonce ヘッダ照合。`http_pr
 DB パス解決の npx 版互換化（`bin/lib.js` `resolveDbPath()` を `src/db_path.rs` へ移植、単体テストあり）、
 `fallbackToSource: true` の確認完了（バイトコード化不能ファイルをソース同梱するフラグ。
 本プロジェクトは公開OSSでソース同梱に不利益なし、pkg assets（`desktop/pkg.config.json`）は
-ビルド出力と better-sqlite3 系のみでシークレット・ローカル設定の混入なし → 維持を決定）。
+ビルド出力と better-sqlite3 系のみでシークレット・ローカル設定の混入なし → 維持を決定）、
+3OS ビルド（GitHub Actions マトリックス + target triple 動的導出 + アイコン一式 +
+サイドカースモークテスト。各 OS ランナーでのネイティブビルド方式）。
 
 製品化する場合の残課題（Codex レビュー指摘含む）:
 
-- **3OS ビルド**: tauri-action の CI マトリックス前提（macOS はクロス不可）。Windows/macOS 用の
-  better-sqlite3 prebuilt `.node` 差し替え、target triple の動的導出
 - **localhost 露出**: サーバーは他プロセスからも到達可能。起動時生成トークンでの防御を検討
   （起動 nonce は health で誰でも取得できるため転用不可。認可用は別トークンが必要）
 - **サイドカーログの redaction**: 現状はサーバー出力を無加工で転送している。サーバー側は
@@ -106,6 +139,8 @@ DB パス解決の npx 版互換化（`bin/lib.js` `resolveDbPath()` を `src/db
   防衛線として `Authorization:` 等をマスクする redaction 層をログポンプに入れる
 - **Linux 配布の注意**: 「Node 不要」は満たすが WebKitGTK 等のシステム依存は残る
   （Windows/macOS は WebView が OS 同梱のため問題が小さい）
+- **コード署名 / notarization**: Windows・macOS とも未署名（macOS は Gatekeeper 回避手順で
+  対応、Windows は SmartScreen 警告が出る）。広く配布するなら署名が必要
 
 ## WSLg での注意
 
